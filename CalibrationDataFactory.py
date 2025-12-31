@@ -50,9 +50,10 @@ class CalibrationDataFactory(object):
    def create_from_file(directory, 
                         calibrationformat = 'blackbody',
                         filetype = 'rjpeg',
-                        bitdepth = 16):
+                        bitdepth = 16,
+                        rsr = None):
       if calibrationformat.lower() == 'blackbody':
-            return LWIRimagetool.BlackbodyCalibration(directory,filetype) 
+            return LWIRimagetool.BlackbodyCalibration(directory,filetype,rsr) 
          
       
 

@@ -10,12 +10,12 @@ import os
 import numpy as np
 
 class BlackbodyCalibration(LWIRimagetool.CalibrationData):
-    def __init__(self,directory,filetype):
+    def __init__(self,directory,filetype,rsr):
         LWIRimagetool.CalibrationData.__init__(self)
-        self.generate_coefficients(directory,filetype)
+        self.generate_coefficients(directory,filetype,rsr)
 
 
-    def generate_coefficients(self,directory,filetype):
+    def generate_coefficients(self,directory,filetype,rsr):
         """
         Calculates regional averages based on a blackbody run. These regional averages
         are then plotted against calculated blackbody radiances, linear regression is performed
@@ -142,14 +142,27 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
                         step_cum_sum = float(step_cum_sum / count)   
                         step_averages = np.append(step_averages,[step_cum_sum])
 
-                ### GENERATING BLACKBODY BAND RADIANCES ###
-                blackbody = LWIRimagetool.Blackbody()
-                wavelengths = np.linspace(8, 14, 10000)
-                band_radiances = []
-                for i in range(step_averages.shape[0]):
-                    temp = 283 + i*5.0 # Assumes that the blackbody run is moving by 5 degree steps -- may need to make this adjustable
-                    blackbody.absolute_temperature = temp
-                    band_radiances.append(blackbody.band_radiance(wavelengths))
+                if rsr is not None:
+                    ### GENERATING BLACKBODY BAND RADIANCES ###
+                    blackbody = LWIRimagetool.Blackbody()
+                    txt_content = np.loadtxt(file_path,skiprows=1,delimiter=',')
+                    wavelengths = txt_content[:,0]
+                    response = txt_content[:,1]
+                    band_radiances = []
+                    for i in range(step_averages.shape[0]):
+                        temp = 283 + i*5.0 # Assumes that the blackbody run is moving by 5 degree steps -- may need to make this adjustable
+                        blackbody.absolute_temperature = temp
+                        band_radiances.append(blackbody.band_radiance(wavelengths,response))
+                else:
+                    ### GENERATING BLACKBODY BAND RADIANCES ###
+                    blackbody = LWIRimagetool.Blackbody()
+                    wavelengths = np.linspace(8, 14, 10000)
+                    band_radiances = []
+                    for i in range(step_averages.shape[0]):
+                        temp = 283 + i*5.0 # Assumes that the blackbody run is moving by 5 degree steps -- may need to make this adjustable
+                        blackbody.absolute_temperature = temp
+                        band_radiances.append(blackbody.band_radiance(wavelengths))
+
 
                 ### APPLYING LINEAR REGRESSION TO FIND GAIN AND BIAS TERMS ###
                 gain, bias = np.polyfit(step_averages,band_radiances,1)
