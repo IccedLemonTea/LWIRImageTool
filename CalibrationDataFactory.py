@@ -51,9 +51,10 @@ class CalibrationDataFactory(object):
                         calibrationformat = 'blackbody',
                         filetype = 'rjpeg',
                         bitdepth = 16,
-                        rsr = None):
+                        rsr = None,
+                        progress_cb = None):
       if calibrationformat.lower() == 'blackbody':
-            return LWIRimagetool.BlackbodyCalibration(directory,filetype,rsr) 
+            return LWIRimagetool.BlackbodyCalibration(directory,filetype,rsr,progress_cb) 
          
       
 

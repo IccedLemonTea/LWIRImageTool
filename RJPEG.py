@@ -9,7 +9,7 @@ import LWIRimagetool
 import os
 import numpy as np
 import subprocess
-import PIL
+import PIL.Image
 import io
 
 class RJPEG(LWIRimagetool.ImageData):

@@ -10,12 +10,12 @@ import os
 import numpy as np
 
 class BlackbodyCalibration(LWIRimagetool.CalibrationData):
-    def __init__(self,directory,filetype,rsr):
+    def __init__(self,directory,filetype,rsr, progress_cb):
         LWIRimagetool.CalibrationData.__init__(self)
-        self.generate_coefficients(directory,filetype,rsr)
+        self.generate_coefficients(directory,filetype,rsr, progress_cb)
 
 
-    def generate_coefficients(self,directory,filetype,rsr):
+    def generate_coefficients(self,directory,filetype,rsr, progress_cb):
         """
         Calculates regional averages based on a blackbody run. These regional averages
         are then plotted against calculated blackbody radiances, linear regression is performed
@@ -29,7 +29,8 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
 
         directory = os.fsencode(directory)
         first_image_path = None
-        print(directory)
+        total_files = len(os.listdir(directory))
+        idx = 0
         # Loop through each image
         for file in sorted(os.listdir(directory)):
             filename = os.fsdecode(file)
@@ -39,12 +40,29 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
                 first_src = Factory.create_from_file(file_path,filetype)
                 image_stack = np.array(first_src.raw_counts)
                 first_image_path = file_path
+
+                ### PROGRESS CALLBACK FOR GUI ###
+                if progress_cb:
+                    progress_cb(phase = "loading",
+                                current = idx + 1,
+                                total = total_files)
+                    idx = idx + 1
             else:
                 src = Factory.create_from_file(file_path,filetype)
                 image_stack = np.dstack((image_stack,src.raw_counts))
+                
+                ### PROGRESS CALLBACK FOR GUI ###
+                if progress_cb:
+                    progress_cb(phase = "loading",
+                                current = idx + 1,
+                                total = total_files)
+                    idx = idx+1
         
+        total_pixels = image_stack.shape[0] * image_stack.shape[1]
+        pixel_count = 0
         for col in range(image_stack.shape(0)):
             for row in range(image_stack.shape(1)):
+                pixel_count += 1
                 
                 ### SELECTING PIXEL AND GRABBING STATS ###
                 # individual pixel being selected as a 1d vector, changing with time
@@ -96,7 +114,7 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
                     if second_derivative[i] <= (-3*stdev_second_deriv + mean_second_deriv):
                         ascension_end.append(i)
 
-                # Window searching 1% of the data size
+                ### WINDOW SEARCHING 1% OF DATA SIZE ###
                 window = int(len(means))*0.01 
                 ascensions = False
                 # print(f"ascenscion start size{len(ascension_start)} ascenscion end size{len(ascension_end)}")
@@ -126,7 +144,7 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
                 step_averages = np.array([])
                 average_x_vals = np.array([])
 
-                # Averaging between the end of one ascension and beginning of next
+                ### AVERAGING BETWEEN ASCENSIONS ###
                 # 2nd derivative min --> 2nd derivative max
                 for i in range(0, array_of_avg_coords.shape[0]-1,2):
                     step_cum_sum = 0.0
@@ -169,6 +187,13 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
                 cal_array = np.empty((src.raw_counts.shape[0],src.raw_counts.shape[1]))
                 cal_array[row,col,0] = gain
                 cal_array[row,col,1] = bias
+
+                ### PROGRESS CALLBACK FOR GUI ###
+                if progress_cb and pixel_count % 500 == 0:
+                    progress_cb(phase = "calibrating",
+                                current = pixel_count,
+                                total = total_pixels)
+    
 
         return cal_array
         
