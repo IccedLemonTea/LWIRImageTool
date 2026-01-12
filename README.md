@@ -1,4 +1,4 @@
-# SUAS Scripts
+# LWIRImageTool
 
 This repository contains a Python module for the calibration and correction of Long Wave Infrared Imagery (LWIR)
 
@@ -6,7 +6,7 @@ This repository contains a Python module for the calibration and correction of L
 
 Clone the repository and install the required dependencies:
 * git clone https://github.com/IccedLemonTea/LWIRImageTool.git
-* cd suas_scripts
+* cd LWIRImageTool
 
 ## Requirements 
 
