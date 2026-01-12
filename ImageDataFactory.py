@@ -54,6 +54,15 @@ class ImageDataFactory(object):
          return LWIRimagetool.ENVI(filename) # Need to create ENVI.py that reads in the ENVI (DRSTamarisk640) image
       elif fileformat.lower() == 'rjpeg':
          return LWIRimagetool.RJPEG(filename) # Need to create RJPEG.py that reads in the RJPEG (Flir Siras) image
+      
+   @staticmethod
+   def is_valid_image_file(filename, fileformat):
+    if fileformat == "rjpeg":
+        return filename.endswith("_R.jpg")
+    elif fileformat == "envi":
+        return filename.endswith(".hdr")
+    else:
+        return False
          
       
 
