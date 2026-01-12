@@ -21,7 +21,7 @@ class CalibrationData(object):
         return self._image_stack
 
     @image_stack.setter
-    def coefficients(self, image_stack):
+    def image_stack(self, image_stack):
         self._image_stack = image_stack
 
     @coefficients.setter

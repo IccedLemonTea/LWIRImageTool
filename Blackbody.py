@@ -52,11 +52,10 @@ class Blackbody(object):
             
             denominator = (wavelength[i]*wavelength[i]*wavelength[i]*wavelength[i]*wavelength[i]*1000000.0)
             exponent = plancks_constant*speed_of_light_constant/(wavelength[i] * boltzmann_constant * self._absolute_temperature)
-
-            spectral_radiance.append(numerator/denominator * 1/(math.exp(exponent)-1)) # [W/m^2/sr/micron]
-
-        if rsr is not None:
-            spectral_radiance *= np.asarry(rsr)
+            if rsr is not None:
+                spectral_radiance.append(numerator/denominator * 1/(math.exp(exponent)-1)*rsr[i])
+            else:
+                spectral_radiance.append(numerator/denominator * 1/(math.exp(exponent)-1)) # [W/m^2/sr/micron]
 
         return spectral_radiance # [W/m^2/sr/micron]
     
@@ -66,7 +65,11 @@ class Blackbody(object):
             wavelengths(list or 1D-np.array) must be in microns
             rsr(list or 1D-np.array) relative spectral response of the system
         """
+
+
         spectral_radiance = self.spectral_radiance(wavelengths,rsr)
+
+        print(spectral_radiance, wavelengths)
         int_radiance = integrate.simpson(spectral_radiance,wavelengths)
         return int_radiance # [W/m^2/sr]
 

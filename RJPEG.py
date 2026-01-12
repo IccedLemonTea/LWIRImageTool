@@ -27,19 +27,29 @@ class RJPEG(LWIRimagetool.ImageData):
         np.ndarray: Array containing the Thermal Images
 
         """
+        if not filename.endswith("_R.jpg"):
+            print(f"Skipping RJPEG file: {filename}")
+            return None
 
-        ## Reading in image
-        cmd = ["exiftool", "-b", "-RawThermalImage", filename]
-        result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    check=True)
-        blob = result.stdout
+        try:
+            ## Reading in image
+            cmd = ["exiftool", "-b", "-RawThermalImage", filename]
+            result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        check=True)
+            blob = result.stdout
 
-        raw = PIL.Image.open(io.BytesIO(blob))
-        img = np.array(raw)
-        if img.dtype != np.uint16:
-            img = img.astype(np.uint16, copy=False)
-        
-        self._raw_counts = img
+            raw = PIL.Image.open(io.BytesIO(blob))
+            img = np.array(raw)
+            if img.dtype != np.uint16:
+                img = img.astype(np.uint16, copy=False)
+            
+            self._raw_counts = img
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Exiftool failed for {filename}") from e
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to decode thermal image: {filename}") from e
+
 
