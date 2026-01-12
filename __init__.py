@@ -9,5 +9,6 @@ from .CalibrationDataFactory import CalibrationDataFactory
 from .CalibrationData import CalibrationData
 from .BlackbodyCalibration import BlackbodyCalibration
 from .Blackbody import Blackbody
+from .StackImages import stack_images
 
 __all__ = ["ImageDataFactory", "ImageData", "ENVI", "RJPEG", "CalibrationDataFactory", "CalibrationData", "BlackbodyCalibration", "Blackbody"]

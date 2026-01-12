@@ -5,18 +5,17 @@
 
 
 import LWIRimagetool
-import os
 import numpy as np
 
 class BlackbodyCalibration(LWIRimagetool.CalibrationData):
     """
-    Performs blackbody calibration of LWIR images. 
+    Performs blackbody calibration of LWIR images.
 
     This class reads in a sequence of blackbody images, detects temperature 
     ascensions, and calculates gain and bias coefficients for each pixel.
     """
 
-    def __init__(self, directory, filetype, rsr, progress_cb=None):
+    def __init__(self, directory, filetype, blackbody_temperature, temperature_step, rsr = None, progress_cb=None, chunk_fraction = 0.01, deriv_threshold = 3, window_fraction = 0.001):
         """
         Initializes the calibration by stacking images, detecting ascensions,
         and generating calibration coefficients.
@@ -27,60 +26,25 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
             Path to the directory containing blackbody images.
         filetype : str
             Type/format of the image files (e.g., 'rjpeg', 'envi').
+        blackbody_temperature : float
+            Temperature that blackbody starts the run at in [K]
+        temperature_step : float
+            Temperature value that the blackbody changes by between each step in [K]
         rsr : str or None
-            Path to the RSR file containing spectral response and wavelengths. If None, default wavelengths are used.
+            Path to the RSR file containing spectral response and wavelengths. If None, default wavelengths are used. (8-14 microns)
         progress_cb : callable, optional
             Callback function for progress updates. Called with `phase`, `current`, and `total`.
+        deriv_threshold : int
+            Factor to distinguish how far from the stdev the derivative being checked is. Default is 3
+        window_fraction : float
+            Fraction of data to be searched when finding ascensions. Default is 0.001
         """
         LWIRimagetool.CalibrationData.__init__(self)
-        _image_stack = self.stack_images(directory, filetype, progress_cb)
-        _array_of_avg_coords = self.find_ascensions(_image_stack, 0.01, 3, 0.001)
-        self.generate_coefficients(_image_stack, _array_of_avg_coords, rsr, progress_cb)
+        self.image_stack = LWIRimagetool.stack_images(directory, filetype, progress_cb)
+        _array_of_avg_coords = self.find_ascensions(self.image_stack, deriv_threshold, window_fraction, progress_cb)
+        self.coefficients = self.generate_coefficients(self.image_stack, _array_of_avg_coords, blackbody_temperature, temperature_step, rsr, progress_cb)
 
-    def stack_images(self, directory, filetype, progress_cb=None):
-        """
-        Reads all images from a directory and stacks them along a third dimension.
-
-        The third dimension corresponds to time, ordered by the file timestamps.
-
-        Parameters
-        ----------
-        directory : str
-            Path to the directory containing blackbody images.
-        filetype : str
-            Type/format of the image files.
-        progress_cb : callable, optional
-            Callback function for GUI progress updates.
-
-        Returns
-        -------
-        image_stack : np.ndarray
-            3D array containing stacked images with shape (rows, cols, num_frames).
-        """
-        directory = os.fsencode(directory)
-        first_image_path = None
-        total_files = len(os.listdir(directory))
-        idx = 0
-        for file in sorted(os.listdir(directory)):
-            filename = os.fsdecode(file)
-            file_path = os.path.join(os.fsdecode(directory), filename)
-            if first_image_path is None:
-                Factory = LWIRimagetool.ImageDataFactory()
-                first_src = Factory.create_from_file(file_path, filetype)
-                image_stack = np.array(first_src.raw_counts)
-                first_image_path = file_path
-                if progress_cb:
-                    progress_cb(phase="loading", current=idx + 1, total=total_files)
-                    idx += 1
-            else:
-                src = Factory.create_from_file(file_path, filetype)
-                image_stack = np.dstack((image_stack, src.raw_counts))
-                if progress_cb:
-                    progress_cb(phase="loading", current=idx + 1, total=total_files)
-                    idx += 1
-        return image_stack
-
-    def find_ascensions(self, image_stack, chunk_percentage, deriv_threshold, window_fraction):
+    def find_ascensions(self, image_stack, deriv_threshold, window_fraction, progress_cb):
         """
         Detects frame indices corresponding to temperature steps (ascensions) 
         using the mean signal over all pixels.
@@ -101,10 +65,13 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
         array_of_avg_coords : np.ndarray
             Array of start and end indices of temperature steps in frames.
         """
-        means_of_stack = np.mean(image_stack, axis=(0, 1))
-        chunk_size = int(means_of_stack.shape[0] * chunk_percentage)
-        means = [means_of_stack[i:i + chunk_size].mean() for i in range(0, means_of_stack.shape[0], chunk_size)]
 
+        # Optional: update GUI progress after each step
+        if progress_cb:
+            progress_cb(phase="ascension", current=0, total=1)
+
+        ### CALCULATING STATISTICS ###
+        means = np.mean(image_stack,axis=(0,1))
         first_derivative = np.gradient(means)
         second_derivative = np.gradient(first_derivative)
 
@@ -113,41 +80,70 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
         mean_first_deriv = np.mean(first_derivative)
         mean_second_deriv = np.mean(second_derivative)
 
+        ### CALCULATING THE REGIONS OF ASCENSION ###
+        # Vector to hold all values of when the 1st derivative exceeds 3 stdevs of the mean
+        # Means that the DC of the scene is changing --> new temperature being reached in the cal run 
+        # e.g. ascends to a new temperature
         change_in_temp = [0]
-        for i, val in enumerate(first_derivative):
-            if val >= (deriv_threshold * stdev_first_deriv + mean_first_deriv):
-                change_in_temp.append(i)
-        change_in_temp.append(len(first_derivative))
 
-        ascension_start = [i for i, val in enumerate(second_derivative) if val >= (deriv_threshold * stdev_second_deriv + mean_second_deriv)]
-        ascension_end = [i for i, val in enumerate(second_derivative) if val <= (-deriv_threshold * stdev_second_deriv + mean_second_deriv)]
+        for i in range(first_derivative.shape[0]):
+            if first_derivative[i] >= (deriv_threshold*stdev_first_deriv + mean_first_deriv):
+                if change_in_temp is not None:
+                    change_in_temp.append(i)
+                else:
+                    change_in_temp = []
+                    change_in_temp.append(i)
 
-        window = int(len(means) * window_fraction)
+        # Adding end point of derivative vector
+        change_in_temp.append(first_derivative.shape[0])
+
+
+        # Vector to hold all derivative values that 
+        # signal the beginning and end of the temperature change 
+        # portion of the blackbody run (ASCENSION)
+        ascension_start = []
+        ascension_end = []
+        for i in range(second_derivative.shape[0]):
+            if second_derivative[i] >= (deriv_threshold*stdev_second_deriv + mean_second_deriv):
+                ascension_start.append(i)
+            if second_derivative[i] <= (-deriv_threshold*stdev_second_deriv + mean_second_deriv):
+                ascension_end.append(i)
+
+        # Window searching 1% of the data size
+        window = int(len(means))*window_fraction 
         ascensions = False
-        array_of_avg_coords = []
-
-        for i in range(len(change_in_temp) - 1):
+        # print(f"ascenscion start size{len(ascension_start)} ascenscion end size{len(ascension_end)}")
+        # Finding the max and min frame counts of the ascension
+        for i in range(len(change_in_temp)-1):
             temp_ascension = []
-            for start in ascension_start:
-                if abs(change_in_temp[i] - start) <= window:
-                    temp_ascension.append(start)
-            for end in ascension_end:
-                if abs(change_in_temp[i] - end) <= window:
-                    temp_ascension.append(end)
-            if temp_ascension:
+            for j in range(len(ascension_start)-1):
+                if (change_in_temp[i] + window) >= ascension_start[j] and (change_in_temp[i] - window <= ascension_start[j]):
+                    temp_ascension.append(ascension_start[j])
+            for j in range(len(ascension_end)-1):
+                if (change_in_temp[i] + window) >= ascension_end[j] and (change_in_temp[i] - window <= ascension_end[j]):
+                    temp_ascension.append(ascension_end[j])
+
+            if temp_ascension == []:
+                continue
+            else:
                 begin_average = min(temp_ascension)
                 end_average = max(temp_ascension)
-                if not ascensions:
-                    array_of_avg_coords = np.array([0, begin_average, end_average])
-                    ascensions = True
-                else:
-                    array_of_avg_coords = np.append(array_of_avg_coords, [begin_average, end_average])
+                if (change_in_temp[i+1] > change_in_temp[i] + window):
+                    if ascensions == False:
+                        array_of_avg_coords = np.array([0, begin_average, end_average])
+                        ascensions = True
+                    else:
+                        array_of_avg_coords = np.append(array_of_avg_coords,[begin_average,end_average])
+
         array_of_avg_coords = np.append(array_of_avg_coords, len(means))
+        if progress_cb:
+            progress_cb(phase="ascension", current=1, total=1)
+        print(f"ascensions calculated")
         return array_of_avg_coords
 
-    def generate_coefficients(self, image_stack, array_of_avg_coords, rsr, progress_cb=None):
+    def generate_coefficients(self, image_stack, array_of_avg_coords, blackbody_temperature, tempurature_step, rsr, progress_cb):
         """
-        Calculates gain and bias coefficients for each pixel based on blackbody ascensions.
+        Calculates gain and bias coefficients for each pixel in a fully vectorized manner.
 
         Regional averages are computed between ascension intervals, and linear regression 
         is applied to map counts to radiance.
@@ -157,7 +153,7 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
         image_stack : np.ndarray
             3D array of stacked images (rows, cols, num_frames).
         array_of_avg_coords : np.ndarray
-            Array of start and end indices of temperature steps.
+            Array of start and end indices of temperature steps (ascensions).
         rsr : str or None
             Path to RSR file for spectral weighting. If None, default wavelengths are used.
         progress_cb : callable, optional
@@ -166,50 +162,80 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
         Returns
         -------
         cal_array : np.ndarray
-            3D array of calibration coefficients with shape (rows, cols, 2) 
+            3D array of calibration coefficients with shape (rows, cols, 2)
             where [:,:,0] is gain and [:,:,1] is bias.
         """
-        total_pixels = image_stack.shape[0] * image_stack.shape[1]
-        pixel_count = 0
-        cal_array = np.empty((image_stack.shape[0], image_stack.shape[1], 2))
-        for col in range(image_stack.shape[0]):
-            for row in range(image_stack.shape[1]):
-                pixel_count += 1
-                individual_pixel = image_stack[row, col, :]
-                first_derivative = np.gradient(individual_pixel)
-                stdev_first_deriv = np.std(first_derivative)
-                mean_first_deriv = np.mean(first_derivative)
-                chunk_size = int(individual_pixel.shape[0] * 0.001)
 
-                step_averages = np.array([])
-                for i in range(0, array_of_avg_coords.shape[0] - 1, 2):
-                    step_cum_sum = 0.0
-                    count = 0.0
-                    for j in range(array_of_avg_coords[i], array_of_avg_coords[i + 1] - 1):
-                        if first_derivative[j] <= (3 * stdev_first_deriv + mean_first_deriv):
-                            for b in range(j * chunk_size, (j + 1) * chunk_size):
-                                step_cum_sum += individual_pixel[b]
-                                count += 1
-                    if count != 0:
-                        step_cum_sum /= count
-                        step_averages = np.append(step_averages, [step_cum_sum])
+        # Optional: update GUI progress after each step
+        if progress_cb:
+            progress_cb(phase="computing_steps", current=0, total=1)
 
-                # Generate band radiances
-                blackbody = LWIRimagetool.Blackbody()
-                if rsr is not None:
-                    txt_content = np.loadtxt(rsr, skiprows=1, delimiter=',')
-                    wavelengths = txt_content[:, 0]
-                    response = txt_content[:, 1]
-                    band_radiances = [blackbody.band_radiance(wavelengths, response) for i in range(len(step_averages))]
-                else:
-                    wavelengths = np.linspace(8, 14, 10000)
-                    band_radiances = [blackbody.band_radiance(wavelengths) for i in range(len(step_averages))]
+        ### COMPUTING STEP AVERAGES FOR EACH PIXEL ###
+        rows, cols, frames = image_stack.shape
+        n_steps = len(array_of_avg_coords) // 2
 
-                gain, bias = np.polyfit(step_averages, band_radiances, 1)
+        # Preallocate array size
+        step_averages = np.zeros((rows, cols, n_steps))
+        cal_array = np.zeros((rows,cols,2))
+
+        for step in range(n_steps):
+            start = array_of_avg_coords[2*step]
+            end = array_of_avg_coords[2*step + 1]
+
+            # Compute mean over time for all pixels in the step window
+            step_averages[:, :, step] = np.mean(image_stack[:, :, start:end],axis=2)
+
+            # Optional: update GUI progress after each step
+            if progress_cb:
+                progress_cb(phase="computing_steps", current=step+1, total=n_steps)
+            print(f"computing step {(step+1)/n_steps}")
+
+        # Determining usage of Relative Spectral Response Function
+        if rsr:
+            txt_content = np.loadtxt(rsr, skiprows=1, delimiter=',')
+            wavelengths = txt_content[:, 0]
+            response = txt_content[:, 1]
+        else:
+            wavelengths = np.linspace(8, 14, 10000)
+
+        ### GENERATING BAND RADIANCES FOR EACH TEMP STEP ###
+        band_radiances = np.zeros(n_steps)
+        temperatures = blackbody_temperature + np.arange(n_steps) * tempurature_step # [K]
+        bb = LWIRimagetool.Blackbody()
+
+        for i, temp in enumerate(temperatures):
+            bb.absolute_temperature = temp # [K]
+            if rsr:
+                band_radiances[i] = bb.band_radiance(wavelengths, response)
+            else:
+                band_radiances[i] = bb.band_radiance(wavelengths)
+
+        ### PERFORMING LINEAR REGRESSION ###
+        for row in range(image_stack.shape[0]):
+            for col in range(image_stack.shape[1]):
+                gain, bias = np.polyfit(step_averages[row,col,:], band_radiances[:], 1)
                 cal_array[row, col, 0] = gain
                 cal_array[row, col, 1] = bias
 
-                if progress_cb and pixel_count % 500 == 0:
-                    progress_cb(phase="calibrating", current=pixel_count, total=total_pixels)
-
         return cal_array
+    
+if __name__ == "__main__":
+    ### USER TEST CONFIG ###
+    test_directory = "/home/cjw9009/Desktop/Senior_Project/FLIRSIRAS_CalData/20251202_1400"
+    test_filetype = "rjpeg"
+    test_rsr = "/home/cjw9009/Desktop/Senior_Project/FLIRSIRAS_CalData/flir_boson_with_13mm_45fov.txt"   # or "/path/to/rsr.txt"
+
+    ### RUN TEST ###
+    print("Starting BlackbodyCalibration test...")
+
+    calib = BlackbodyCalibration(
+        directory=test_directory,
+        filetype=test_filetype,
+        blackbody_temperature=283.15, 
+        temperature_step=5.0
+        rsr=test_rsr,
+        progress_cb=None   # no GUI during testing
+    )
+
+    print("Calibration object created successfully.")
+    np.save("20251202_1400_fullimage_bbrun_refactored_calarray",calib.coefficients)
