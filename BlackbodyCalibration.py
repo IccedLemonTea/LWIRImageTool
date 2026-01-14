@@ -4,10 +4,15 @@
 # File : Blackbody.py
 
 
-import LWIRimagetool
-import numpy as np
 
-class BlackbodyCalibration(LWIRimagetool.CalibrationData):
+import numpy as np
+from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
+from .CalibrationData import CalibrationData
+from .StackImages import stack_images
+from .Blackbody import Blackbody
+
+
+class BlackbodyCalibration(CalibrationData):
     """
     Performs blackbody calibration of LWIR images.
 
@@ -15,34 +20,15 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
     ascensions, and calculates gain and bias coefficients for each pixel.
     """
 
-    def __init__(self, directory, filetype, blackbody_temperature, temperature_step, rsr = None, progress_cb=None, chunk_fraction = 0.01, deriv_threshold = 3, window_fraction = 0.001):
+    def __init__(self, config : BlackbodyCalibrationConfig):
         """
         Initializes the calibration by stacking images, detecting ascensions,
         and generating calibration coefficients.
-
-        Parameters
-        ----------
-        directory : str
-            Path to the directory containing blackbody images.
-        filetype : str
-            Type/format of the image files (e.g., 'rjpeg', 'envi').
-        blackbody_temperature : float
-            Temperature that blackbody starts the run at in [K]
-        temperature_step : float
-            Temperature value that the blackbody changes by between each step in [K]
-        rsr : str or None
-            Path to the RSR file containing spectral response and wavelengths. If None, default wavelengths are used. (8-14 microns)
-        progress_cb : callable, optional
-            Callback function for progress updates. Called with `phase`, `current`, and `total`.
-        deriv_threshold : int
-            Factor to distinguish how far from the stdev the derivative being checked is. Default is 3
-        window_fraction : float
-            Fraction of data to be searched when finding ascensions. Default is 0.001
         """
-        LWIRimagetool.CalibrationData.__init__(self)
-        self.image_stack = LWIRimagetool.stack_images(directory, filetype, progress_cb)
-        _array_of_avg_coords = self.find_ascensions(self.image_stack, deriv_threshold, window_fraction, progress_cb)
-        self.coefficients = self.generate_coefficients(self.image_stack, _array_of_avg_coords, blackbody_temperature, temperature_step, rsr, progress_cb)
+        CalibrationData.__init__(self)
+        self.image_stack = stack_images(config.directory, config.filetype, config.progress_cb)
+        _array_of_avg_coords = self.find_ascensions(self.image_stack, config.deriv_threshold, config.window_fraction, config.progress_cb)
+        self.coefficients = self.generate_coefficients(self.image_stack, _array_of_avg_coords, config.blackbody_temperature, config.temperature_step, config.rsr, config.progress_cb)
 
     def find_ascensions(self, image_stack, deriv_threshold, window_fraction, progress_cb):
         """
@@ -201,7 +187,7 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
         ### GENERATING BAND RADIANCES FOR EACH TEMP STEP ###
         band_radiances = np.zeros(n_steps)
         temperatures = blackbody_temperature + np.arange(n_steps) * tempurature_step # [K]
-        bb = LWIRimagetool.Blackbody()
+        bb = Blackbody()
 
         for i, temp in enumerate(temperatures):
             bb.absolute_temperature = temp # [K]
@@ -220,22 +206,39 @@ class BlackbodyCalibration(LWIRimagetool.CalibrationData):
         return cal_array
     
 if __name__ == "__main__":
+    import numpy as np
+    from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
+    from .CalibrationDataFactory import CalibrationDataFactory
+
     ### USER TEST CONFIG ###
     test_directory = "/home/cjw9009/Desktop/Senior_Project/FLIRSIRAS_CalData/20251202_1400"
     test_filetype = "rjpeg"
-    test_rsr = "/home/cjw9009/Desktop/Senior_Project/FLIRSIRAS_CalData/flir_boson_with_13mm_45fov.txt"   # or "/path/to/rsr.txt"
+    test_rsr = "/home/cjw9009/Desktop/Senior_Project/FLIRSIRAS_CalData/flir_boson_with_13mm_45fov.txt"
 
-    ### RUN TEST ###
     print("Starting BlackbodyCalibration test...")
 
-    calib = BlackbodyCalibration(
+    # Build validated config 
+    config = BlackbodyCalibrationConfig(
         directory=test_directory,
         filetype=test_filetype,
-        blackbody_temperature=283.15, 
-        temperature_step=5.0
+        blackbody_temperature=283.15,   # K
+        temperature_step=5.0,           # K
         rsr=test_rsr,
-        progress_cb=None   # no GUI during testing
+        progress_cb=None
     )
+    print("Config Validated")
+    # Create calibration via factory
+    calib = CalibrationDataFactory.create(config)
 
     print("Calibration object created successfully.")
-    np.save("20251202_1400_fullimage_bbrun_refactored_calarray",calib.coefficients)
+    print(f"Image stack shape: {calib.image_stack.shape}")
+    print(f"Coefficient array shape: {calib.coefficients.shape}")
+
+    # Save coefficients
+    np.save(
+        "test.npy",
+        calib.coefficients
+    )
+
+    print("Calibration coefficients saved.")
+

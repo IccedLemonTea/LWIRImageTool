@@ -3,27 +3,16 @@
 # Date : 11/08/2025
 # File : CalibrationData.py
 
+from pydantic import BaseModel, ConfigDict
+import numpy as np
+from typing import Optional
 
-import numpy
+class CalibrationData(BaseModel):
+    """
+    Base calibration data container.
+    """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-class CalibrationData(object):
+    image_stack: Optional[np.ndarray] = None
+    coefficients: Optional[np.ndarray] = None
 
-    def __init__(self):
-        self._coefficients = None
-        self._image_stack = None
-
-    @property
-    def coefficients(self):
-        return self._coefficients
-    
-    @property
-    def image_stack(self):
-        return self._image_stack
-
-    @image_stack.setter
-    def image_stack(self, image_stack):
-        self._image_stack = image_stack
-
-    @coefficients.setter
-    def coefficients(self, coefficients):
-        self._coefficients = coefficients

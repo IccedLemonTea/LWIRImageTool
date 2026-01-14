@@ -3,7 +3,9 @@
 # Date : 11/07/2025
 # File : CalibrationDataFactory.py
 
-import LWIRimagetool
+from typing import Union
+from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
+
 
 class CalibrationDataFactory(object):
    """
@@ -47,14 +49,12 @@ class CalibrationDataFactory(object):
 
 
    @staticmethod
-   def create_from_file(directory, 
-                        calibrationformat = 'blackbody',
-                        filetype = 'rjpeg',
-                        bitdepth = 16,
-                        rsr = None,
-                        progress_cb = None):
-      if calibrationformat.lower() == 'blackbody':
-            return LWIRimagetool.BlackbodyCalibration(directory,filetype,rsr,progress_cb) 
+   def create(config: Union[BlackbodyCalibrationConfig]): # Insert other modes of Cal here
+      from .BlackbodyCalibration import BlackbodyCalibration
+      if isinstance(config, BlackbodyCalibrationConfig):
+         return BlackbodyCalibration(config)
+
+      raise ValueError(f"Unsupported calibration config: {type(config)}")
          
       
 
