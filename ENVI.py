@@ -4,15 +4,15 @@
 # File : ENVI.py
 
 
-import LWIRimagetool
+import LWIRImageTool
 
 import os
 import numpy as np
 import spectral.io.envi as envi
 
-class ENVI(LWIRimagetool.ImageData):
+class ENVI(LWIRImageTool.ImageData):
     def __init__(self,filename):
-        LWIRimagetool.ImageData.__init__(self)
+        LWIRImageTool.ImageData.__init__(self)
         self.__reader(filename)
 
 

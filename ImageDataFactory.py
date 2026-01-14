@@ -3,7 +3,7 @@
 # Date : 09/30/2025
 # File : ImageDataFactory.py
 
-import LWIRimagetool
+import LWIRImageTool
 
 class ImageDataFactory(object):
    """
@@ -51,9 +51,9 @@ class ImageDataFactory(object):
                         fileformat = 'envi',
                         bitdepth = 16):
       if fileformat.lower() == 'envi':
-         return LWIRimagetool.ENVI(filename) # Need to create ENVI.py that reads in the ENVI (DRSTamarisk640) image
+         return LWIRImageTool.ENVI(filename) # Need to create ENVI.py that reads in the ENVI (DRSTamarisk640) image
       elif fileformat.lower() == 'rjpeg':
-         return LWIRimagetool.RJPEG(filename) # Need to create RJPEG.py that reads in the RJPEG (Flir Siras) image
+         return LWIRImageTool.RJPEG(filename) # Need to create RJPEG.py that reads in the RJPEG (Flir Siras) image
       
    @staticmethod
    def is_valid_image_file(filename, fileformat):

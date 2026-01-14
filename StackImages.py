@@ -1,5 +1,5 @@
 import numpy as np
-import LWIRimagetool
+import LWIRImageTool
 import os
 
 
@@ -24,7 +24,7 @@ def stack_images(directory, filetype, progress_cb=None):
         3D array containing stacked images with shape (rows, cols, num_frames).
     """
     ### PREALLOCATING SPACE FOR VECTORS AND SORTING DIR FOR IMAGES ###
-    factory = LWIRimagetool.ImageDataFactory()
+    factory = LWIRImageTool.ImageDataFactory()
     file_list = sorted(os.listdir(directory))
     image_list = []
 

@@ -4,7 +4,7 @@
 # File : RJPEG.py
 
 
-import LWIRimagetool
+import LWIRImageTool
 
 import os
 import numpy as np
@@ -12,9 +12,9 @@ import subprocess
 import PIL.Image
 import io
 
-class RJPEG(LWIRimagetool.ImageData):
+class RJPEG(LWIRImageTool.ImageData):
     def __init__(self,filename: str):
-        LWIRimagetool.ImageData.__init__(self)
+        LWIRImageTool.ImageData.__init__(self)
         self.__reader(filename)
 
 

@@ -1,4 +1,4 @@
-# LWIRimagetool/__init__.py
+# LWIRImageTool/__init__.py
 
 from .ImageDataFactory import ImageDataFactory
 from .ImageData import ImageData
