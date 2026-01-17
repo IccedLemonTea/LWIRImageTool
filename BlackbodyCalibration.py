@@ -236,7 +236,7 @@ if __name__ == "__main__":
 
     # Save coefficients
     np.save(
-        "test.npy",
+        "2025.npy",
         calib.coefficients
     )
 
