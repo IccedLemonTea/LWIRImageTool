@@ -9,6 +9,7 @@ import LWIRImageTool
 import os
 import numpy as np
 import spectral.io.envi as envi
+from pydantic import BaseModel 
 
 class ENVI(LWIRImageTool.ImageData):
     def __init__(self,filename):

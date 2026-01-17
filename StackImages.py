@@ -55,7 +55,19 @@ def stack_images(directory, filetype, progress_cb=None):
         # Optional callback for GUI
         if progress_cb:
             progress_cb(phase="loading", current=idx + 1, total=num_frames)
-            print(f"the current index is {idx+1}")
             idx += 1
 
     return image_stack
+
+if __name__ == "__main__":
+    from .StackImages import stack_images
+    import numpy as np
+
+    dir = "/home/cjw9009/Desktop/Senior_Project/FLIRSIRAS_CalData/20251202_1700/"
+
+    print(f"Stacking images...")
+    stack = stack_images(directory = dir, filetype = 'rjpeg')
+
+
+
+    np.save("20251202_1700_imagestack_new.npy", stack)

@@ -45,7 +45,7 @@ class RJPEG(LWIRImageTool.ImageData):
             if img.dtype != np.uint16:
                 img = img.astype(np.uint16, copy=False)
             
-            self._raw_counts = img
+            self.raw_counts = img
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Exiftool failed for {filename}") from e
 
