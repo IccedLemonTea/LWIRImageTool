@@ -30,7 +30,7 @@ class BlackbodyCalibration(CalibrationData):
         _array_of_avg_coords = self.find_ascensions(self.image_stack, config.deriv_threshold, config.window_fraction, config.progress_cb)
         self.coefficients = self.generate_coefficients(self.image_stack, _array_of_avg_coords, config.blackbody_temperature, config.temperature_step, config.rsr, config.progress_cb)
 
-    def find_ascensions(self, image_stack, deriv_threshold, window_fraction, progress_cb):
+    def find_ascensions(self, image_stack, deriv_threshold = 3, window_fraction = 0.001, progress_cb = None):
         """
         Detects frame indices corresponding to temperature steps (ascensions) 
         using the mean signal over all pixels.
@@ -209,11 +209,18 @@ if __name__ == "__main__":
     import numpy as np
     from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
     from .CalibrationDataFactory import CalibrationDataFactory
+    from .StackImages import stack_images
+    import scipy.integrate as integrate
+    import matplotlib.pyplot as plt
+
+    txt_content = np.loadtxt("/home/cjw9009/Desktop/suas_data/flir_boson_with_13mm_45fov.txt", skiprows=1, delimiter=',')
+    wavelengths = txt_content[:, 0]
+    response = txt_content[:, 1]
 
     ### USER TEST CONFIG ###
-    test_directory = "/home/cjw9009/Desktop/Senior_Project/FLIRSIRAS_CalData/20251202_1400"
+    test_directory = "/home/cjw9009/Desktop/suas_data/FLIRSIRAS_CalData/20251202_1400"
     test_filetype = "rjpeg"
-    test_rsr = "/home/cjw9009/Desktop/Senior_Project/FLIRSIRAS_CalData/flir_boson_with_13mm_45fov.txt"
+    test_rsr = "/home/cjw9009/Desktop/suas_data/flir_boson_with_13mm_45fov.txt"
 
     print("Starting BlackbodyCalibration test...")
 
@@ -239,6 +246,66 @@ if __name__ == "__main__":
         "2025.npy",
         calib.coefficients
     )
+    calib.coefficients = np.load("/home/cjw9009/Desktop/Senior_Project/src/20251202_1400_Cal_Work/20251202_1400_fullimage_bbrun_cal_array_corrected.npy")
+    stack = calib.image_stack
+    array_of_avg_coords = calib.find_ascensions(stack, 3, 0.001,[])
+    # multiply DC by gain, add bias to get per pixel radiance
 
-    print("Calibration coefficients saved.")
+    # NEDT Calculation ### ADD CODE HERE
+    temp_list = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
+    NEDT_array = np.empty((stack.shape[0], stack.shape[1], len(temp_list)))
+    
+    for r in range(stack.shape[0]):
+        for c in range(stack.shape[1]):
+            # multiply DC by gain, add bias to get per pixel radiance
+            individual_pixel_radiance = stack[r,c,:]*calib.coefficients[r,c,0] + calib.coefficients[r,c,1]
+
+    for idx, T0 in enumerate(temp_list):
+        start = array_of_avg_coords[2 * idx]
+        stop  = array_of_avg_coords[2 * idx + 1]
+
+        # frame differencing
+        avg_diffs = 0.0
+        for i in range(start, stop-2):
+            diff = individual_pixel_radiance[i+1]-individual_pixel_radiance[i]
+            avg_diffs += diff
+        
+        print(f"Stop {stop} Start {start}")
+        if (start-stop-2) != 0:
+            avg_diffs = avg_diffs / (stop-start-2)
+        else:
+            avg_diffs = 0
+            print(f"start-stop-2 was zero")
+
+        sum = 0.0
+        for i in range(start, stop-2):
+            sum += (individual_pixel_radiance[i+1] + individual_pixel_radiance[i] - avg_diffs)**2
+        if (start-stop-2) != 0:
+            sigma_L = np.sqrt(sum / (stop-start-2))/np.sqrt(2)
+        else:
+            avg_diffs = 0
+            print(f"start-stop-2 was zero")
+        
+        h = 6.62607015e-34
+        c_speed = 299792458
+        k = 1.380649e-23
+        # wavelengths is already defined from txt file
+
+        x0 = (h * c_speed)/ (wavelengths * k * T0)
+        exp_x0 = np.exp(x0)
+        dLdT = (2 * h * c_speed**2) / (wavelengths**5) / (exp_x0 - 1)**2 * exp_x0 * x0 / T0
+        dLdT = integrate.simpson(dLdT * response, wavelengths)
+        NEDT_array[r, c, idx] = sigma_L / dLdT
+    # save NEDT array
+    np.save("20251202_1400_fullimage_bbrun_NEDT_array", NEDT_array)
+    mean_NEDT = np.mean(NEDT_array,axis=(0,1))
+    print(f"Size of mean_NEDT{mean_NEDT.shape}")
+    plt.scatter(range(10,71,5), mean_NEDT)
+    plt.title("Average NEDT at each step")
+    plt.xlabel("Temperature in Kelvin (Step Temperature)")
+    plt.ylabel("Mean NEDT")
+    plt.show()
+
+
+
 
