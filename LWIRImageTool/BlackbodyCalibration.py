@@ -246,7 +246,7 @@ if __name__ == "__main__":
         "2025.npy",
         calib.coefficients
     )
-    calib.coefficients = np.load("/home/cjw9009/Desktop/Senior_Project/src/20251202_1400_Cal_Work/20251202_1400_fullimage_bbrun_cal_array_corrected.npy")
+   
     stack = calib.image_stack
     array_of_avg_coords = calib.find_ascensions(stack, 3, 0.001,[])
     # multiply DC by gain, add bias to get per pixel radiance
