@@ -266,22 +266,22 @@ if __name__ == "__main__":
 
         # frame differencing
         avg_diffs = 0.0
-        for i in range(start, stop-2):
+        for i in range(start, stop,1):
             diff = individual_pixel_radiance[i+1]-individual_pixel_radiance[i]
             avg_diffs += diff
         
         print(f"Stop {stop} Start {start}")
-        if (start-stop-2) != 0:
-            avg_diffs = avg_diffs / (stop-start-2)
+        if (start-stop) != 0:
+            avg_diffs = avg_diffs / (stop-start)
         else:
             avg_diffs = 0
             print(f"start-stop-2 was zero")
 
         sum = 0.0
-        for i in range(start, stop-2):
+        for i in range(start, stop,1):
             sum += (individual_pixel_radiance[i+1] + individual_pixel_radiance[i] - avg_diffs)**2
-        if (start-stop-2) != 0:
-            sigma_L = np.sqrt(sum / (stop-start-2))/np.sqrt(2)
+        if (start-stop) != 0:
+            sigma_L = np.sqrt(sum / (stop-start))/np.sqrt(2)
         else:
             avg_diffs = 0
             print(f"start-stop-2 was zero")
