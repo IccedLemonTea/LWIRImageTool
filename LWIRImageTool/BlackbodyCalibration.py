@@ -124,7 +124,6 @@ class BlackbodyCalibration(CalibrationData):
         array_of_avg_coords = np.append(array_of_avg_coords, len(means))
         if progress_cb:
             progress_cb(phase="ascension", current=1, total=1)
-        print(f"ascensions calculated")
         return array_of_avg_coords
 
     def generate_coefficients(self, image_stack, array_of_avg_coords, blackbody_temperature, tempurature_step, rsr, progress_cb):
@@ -174,7 +173,6 @@ class BlackbodyCalibration(CalibrationData):
             # Optional: update GUI progress after each step
             if progress_cb:
                 progress_cb(phase="computing_steps", current=step+1, total=n_steps)
-            print(f"computing step {(step+1)/n_steps}")
 
         # Determining usage of Relative Spectral Response Function
         if rsr:
@@ -212,6 +210,8 @@ if __name__ == "__main__":
     from .StackImages import stack_images
     import scipy.integrate as integrate
     import matplotlib.pyplot as plt
+    import scipy.constants as const
+    import math
 
     txt_content = np.loadtxt("/home/cjw9009/Desktop/suas_data/flir_boson_with_13mm_45fov.txt", skiprows=1, delimiter=',')
     wavelengths = txt_content[:, 0]
@@ -252,52 +252,59 @@ if __name__ == "__main__":
     # multiply DC by gain, add bias to get per pixel radiance
 
     # NEDT Calculation ### ADD CODE HERE
-    temp_list = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
-    NEDT_array = np.empty((stack.shape[0], stack.shape[1], len(temp_list)))
     
+
+    temps = [283.15, 288.15, 293.15, 298.15, 303.15, 308.15, 313.15, 318.15, 323.15, 328.15, 333.15, 338.15, 343.15]
+    NEDT_array = np.empty((stack.shape[0], stack.shape[1], len(temps)))
+    plancks_constant = const.h # 6.62607015e-34 [Joules*Seconds] 
+    speed_of_light_constant = const.c # 299792458.0 [Meters/Second]
+    boltzmann_constant = const.k # 1.380649e-23 [Joules/Kelvin]
+
+    wavelengths = wavelengths*0.000001
+    numerator = 2*plancks_constant*speed_of_light_constant*speed_of_light_constant
+
+    # Precompute wavelength-only constants (done ONCE)
+    wl = wavelengths
+    wl5 = wl**5
+    resp = response
+
+    hc_over_k = plancks_constant * speed_of_light_constant / boltzmann_constant
+
     for r in range(stack.shape[0]):
         for c in range(stack.shape[1]):
-            # multiply DC by gain, add bias to get per pixel radiance
-            individual_pixel_radiance = stack[r,c,:]*calib.coefficients[r,c,0] + calib.coefficients[r,c,1]
+            
+            individual_pixel = stack[r,c,:]
+            individual_pixel_rad = individual_pixel * calib.coefficients[r,c,0] + calib.coefficients[r,c,1]
+            pixel_rad = individual_pixel_rad  # alias (faster lookup)
 
-    for idx, T0 in enumerate(temp_list):
-        start = array_of_avg_coords[2 * idx]
-        stop  = array_of_avg_coords[2 * idx + 1]
+            for i, To in enumerate(temps):
 
-        # frame differencing
-        avg_diffs = 0.0
-        for i in range(start, stop,1):
-            diff = individual_pixel_radiance[i+1]-individual_pixel_radiance[i]
-            avg_diffs += diff
-        
-        print(f"Stop {stop} Start {start}")
-        if (start-stop) != 0:
-            avg_diffs = avg_diffs / (stop-start)
-        else:
-            avg_diffs = 0
-            print(f"start-stop-2 was zero")
+                start = array_of_avg_coords[2*i]
+                stop  = array_of_avg_coords[2*i + 1]
 
-        sum = 0.0
-        for i in range(start, stop,1):
-            sum += (individual_pixel_radiance[i+1] + individual_pixel_radiance[i] - avg_diffs)**2
-        if (start-stop) != 0:
-            sigma_L = np.sqrt(sum / (stop-start))/np.sqrt(2)
-        else:
-            avg_diffs = 0
-            print(f"start-stop-2 was zero")
-        
-        h = 6.62607015e-34
-        c_speed = 299792458
-        k = 1.380649e-23
-        # wavelengths is already defined from txt file
+                diffs = np.diff(pixel_rad[start:stop])
 
-        x0 = (h * c_speed)/ (wavelengths * k * T0)
-        exp_x0 = np.exp(x0)
-        dLdT = (2 * h * c_speed**2) / (wavelengths**5) / (exp_x0 - 1)**2 * exp_x0 * x0 / T0
-        dLdT = integrate.simpson(dLdT * response, wavelengths)
-        NEDT_array[r, c, idx] = sigma_L / dLdT
-    # save NEDT array
-    np.save("20251202_1400_fullimage_bbrun_NEDT_array", NEDT_array)
+                avg_diff = np.mean(diffs)
+                sigma_diff = np.std(diffs, ddof=0)
+                sigma = sigma_diff / np.sqrt(2)
+
+                # Vectorized Planck derivative
+                Xo = hc_over_k / (wl * To)
+                expX = np.exp(Xo)
+
+                numerator_dL = numerator * expX * Xo
+                denominator = wl5 * (expX - 1)**2 * To
+
+                dLdT = (numerator_dL / denominator) * resp
+
+                int_dLdT = integrate.simpson(dLdT, wl)
+
+                NEDT_array[r, c, i] = sigma / int_dLdT
+
+
+    print(f"{NEDT_array.shape}")
+
+    np.save("20251202_1400_fullimage_bbrun_NEDT_array_chat.npy", NEDT_array)
     mean_NEDT = np.mean(NEDT_array,axis=(0,1))
     print(f"Size of mean_NEDT{mean_NEDT.shape}")
     plt.scatter(range(10,71,5), mean_NEDT)
@@ -305,6 +312,78 @@ if __name__ == "__main__":
     plt.xlabel("Temperature in Kelvin (Step Temperature)")
     plt.ylabel("Mean NEDT")
     plt.show()
+    
+
+
+
+
+
+
+
+
+        
+
+        
+
+
+
+
+
+
+
+    # temp_list = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
+    # NEDT_array = np.empty((stack.shape[0], stack.shape[1], len(temp_list)))
+    
+    # for r in range(stack.shape[0]):
+    #     for c in range(stack.shape[1]):
+    #         # multiply DC by gain, add bias to get per pixel radiance
+    #         individual_pixel_radiance = stack[r,c,:]*calib.coefficients[r,c,0] + calib.coefficients[r,c,1]
+
+    # for idx, T0 in enumerate(temp_list):
+    #     start = array_of_avg_coords[2 * idx]
+    #     stop  = array_of_avg_coords[2 * idx + 1]
+
+    #     # frame differencing
+    #     avg_diffs = 0.0
+    #     for i in range(start, stop-1,1):
+    #         diff = individual_pixel_radiance[i+1]-individual_pixel_radiance[i]
+    #         avg_diffs += diff
+        
+    #     print(f"Stop {stop} Start {start}")
+    #     if (start-stop) != 0:
+    #         avg_diffs = avg_diffs / (stop-start)
+    #     else:
+    #         avg_diffs = 0
+    #         print(f"start-stop-2 was zero")
+
+    #     sum = 0.0
+    #     for i in range(start, stop-1,1):
+    #         sum += (individual_pixel_radiance[i+1] + individual_pixel_radiance[i] - avg_diffs)**2
+    #     if (start-stop) != 0:
+    #         sigma_L = np.sqrt(sum / (stop-start))/np.sqrt(2)
+    #     else:
+    #         avg_diffs = 0
+    #         print(f"start-stop-2 was zero")
+        
+    #     h = 6.62607015e-34
+    #     c_speed = 299792458
+    #     k = 1.380649e-23
+    #     # wavelengths is already defined from txt file
+    #     wavelengths = wavelengths*0.000001
+    #     x0 = (h * c_speed)/ (wavelengths * k * T0)
+    #     exp_x0 = np.exp(x0)
+    #     dLdT = (2 * h * c_speed**2) / (wavelengths**5 * 1000000.0) / (exp_x0 - 1)**2 * exp_x0 * x0 / T0
+    #     dLdT = integrate.simpson(dLdT * response, wavelengths)
+    #     NEDT_array[r, c, idx] = sigma_L / dLdT
+    # # save NEDT array
+    # np.save("20251202_1400_fullimage_bbrun_NEDT_array", NEDT_array)
+    # mean_NEDT = np.mean(NEDT_array,axis=(0,1))
+    # print(f"Size of mean_NEDT{mean_NEDT.shape}")
+    # plt.scatter(range(10,71,5), mean_NEDT)
+    # plt.title("Average NEDT at each step")
+    # plt.xlabel("Temperature in Kelvin (Step Temperature)")
+    # plt.ylabel("Mean NEDT")
+    # plt.show()
 
 
 
