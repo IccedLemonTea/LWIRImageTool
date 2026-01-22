@@ -69,7 +69,6 @@ class Blackbody(object):
 
         spectral_radiance = self.spectral_radiance(wavelengths,rsr)
 
-        print(spectral_radiance, wavelengths)
         int_radiance = integrate.simpson(spectral_radiance,wavelengths)
         return int_radiance # [W/m^2/sr]
 
