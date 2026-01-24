@@ -3,9 +3,9 @@
 # Date : 01/14/2026
 # File : BlackbodyCalibrationConfig.py
 
-
 from pydantic import BaseModel, Field
 from typing import Optional, Callable
+
 
 class BlackbodyCalibrationConfig(BaseModel):
     """
@@ -34,8 +34,11 @@ class BlackbodyCalibrationConfig(BaseModel):
     directory: str
     filetype: str = "rjpeg"
 
-    blackbody_temperature: float = Field(..., gt=0, description="Starting temperature [K]")
-    temperature_step: float = Field(..., gt=0, description="Temperature step [K]")
+    blackbody_temperature: float = Field(
+        ..., gt=0, description="Starting temperature [K]")
+    temperature_step: float = Field(...,
+                                    gt=0,
+                                    description="Temperature step [K]")
 
     rsr: Optional[str] = None
     progress_cb: Optional[Callable] = None

@@ -3,7 +3,6 @@
 # Date : 10/27/2025
 # File : RJPEG.py
 
-
 import LWIRImageTool
 
 import os
@@ -12,13 +11,14 @@ import subprocess
 import PIL.Image
 import io
 
+
 class RJPEG(LWIRImageTool.ImageData):
-    def __init__(self,filename: str):
+
+    def __init__(self, filename: str):
         LWIRImageTool.ImageData.__init__(self)
         self.__reader(filename)
 
-
-    def __reader(self,filename: str):
+    def __reader(self, filename: str):
         """
         Reads the Thermal Images from RJPEG Files
         Parameters:
@@ -34,22 +34,18 @@ class RJPEG(LWIRImageTool.ImageData):
         try:
             ## Reading in image
             cmd = ["exiftool", "-b", "-RawThermalImage", filename]
-            result = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        check=True)
+            result = subprocess.run(cmd, capture_output=True, check=True)
             blob = result.stdout
 
             raw = PIL.Image.open(io.BytesIO(blob))
             img = np.array(raw)
             if img.dtype != np.uint16:
                 img = img.astype(np.uint16, copy=False)
-            
+
             self.raw_counts = img
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Exiftool failed for {filename}") from e
 
         except Exception as e:
-            raise RuntimeError(f"Failed to decode thermal image: {filename}") from e
-
-
+            raise RuntimeError(
+                f"Failed to decode thermal image: {filename}") from e

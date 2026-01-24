@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 import numpy as np
 from typing import Optional
 
+
 class CalibrationData(BaseModel):
     """
     Base calibration data container.
@@ -15,4 +16,3 @@ class CalibrationData(BaseModel):
 
     image_stack: Optional[np.ndarray] = None
     coefficients: Optional[np.ndarray] = None
-

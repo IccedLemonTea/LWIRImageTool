@@ -3,8 +3,6 @@
 # Date : 12/23/2025
 # File : Blackbody.py
 
-
-
 import numpy as np
 from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
 from .CalibrationData import CalibrationData
@@ -20,17 +18,28 @@ class BlackbodyCalibration(CalibrationData):
     ascensions, and calculates gain and bias coefficients for each pixel.
     """
 
-    def __init__(self, config : BlackbodyCalibrationConfig):
+    def __init__(self, config: BlackbodyCalibrationConfig):
         """
         Initializes the calibration by stacking images, detecting ascensions,
         and generating calibration coefficients.
         """
         CalibrationData.__init__(self)
-        self.image_stack = stack_images(config.directory, config.filetype, config.progress_cb)
-        _array_of_avg_coords = self.find_ascensions(self.image_stack, config.deriv_threshold, config.window_fraction, config.progress_cb)
-        self.coefficients = self.generate_coefficients(self.image_stack, _array_of_avg_coords, config.blackbody_temperature, config.temperature_step, config.rsr, config.progress_cb)
+        self.image_stack = stack_images(config.directory, config.filetype,
+                                        config.progress_cb)
+        _array_of_avg_coords = self.find_ascensions(self.image_stack,
+                                                    config.deriv_threshold,
+                                                    config.window_fraction,
+                                                    config.progress_cb)
+        self.coefficients = self.generate_coefficients(
+            self.image_stack, _array_of_avg_coords,
+            config.blackbody_temperature, config.temperature_step, config.rsr,
+            config.progress_cb)
 
-    def find_ascensions(self, image_stack, deriv_threshold = 3, window_fraction = 0.001, progress_cb = None):
+    def find_ascensions(self,
+                        image_stack,
+                        deriv_threshold=3,
+                        window_fraction=0.001,
+                        progress_cb=None):
         """
         Detects frame indices corresponding to temperature steps (ascensions) 
         using the mean signal over all pixels.
@@ -57,7 +66,7 @@ class BlackbodyCalibration(CalibrationData):
             progress_cb(phase="ascension", current=0, total=1)
 
         ### CALCULATING STATISTICS ###
-        means = np.mean(image_stack,axis=(0,1))
+        means = np.mean(image_stack, axis=(0, 1))
         first_derivative = np.gradient(means)
         second_derivative = np.gradient(first_derivative)
 
@@ -68,12 +77,13 @@ class BlackbodyCalibration(CalibrationData):
 
         ### CALCULATING THE REGIONS OF ASCENSION ###
         # Vector to hold all values of when the 1st derivative exceeds 3 stdevs of the mean
-        # Means that the DC of the scene is changing --> new temperature being reached in the cal run 
+        # Means that the DC of the scene is changing --> new temperature being reached in the cal run
         # e.g. ascends to a new temperature
         change_in_temp = [0]
 
         for i in range(first_derivative.shape[0]):
-            if first_derivative[i] >= (deriv_threshold*stdev_first_deriv + mean_first_deriv):
+            if first_derivative[i] >= (deriv_threshold * stdev_first_deriv +
+                                       mean_first_deriv):
                 if change_in_temp is not None:
                     change_in_temp.append(i)
                 else:
@@ -83,30 +93,33 @@ class BlackbodyCalibration(CalibrationData):
         # Adding end point of derivative vector
         change_in_temp.append(first_derivative.shape[0])
 
-
-        # Vector to hold all derivative values that 
-        # signal the beginning and end of the temperature change 
+        # Vector to hold all derivative values that
+        # signal the beginning and end of the temperature change
         # portion of the blackbody run (ASCENSION)
         ascension_start = []
         ascension_end = []
         for i in range(second_derivative.shape[0]):
-            if second_derivative[i] >= (deriv_threshold*stdev_second_deriv + mean_second_deriv):
+            if second_derivative[i] >= (deriv_threshold * stdev_second_deriv +
+                                        mean_second_deriv):
                 ascension_start.append(i)
-            if second_derivative[i] <= (-deriv_threshold*stdev_second_deriv + mean_second_deriv):
+            if second_derivative[i] <= (-deriv_threshold * stdev_second_deriv +
+                                        mean_second_deriv):
                 ascension_end.append(i)
 
         # Window searching 1% of the data size
-        window = int(len(means))*window_fraction 
+        window = int(len(means)) * window_fraction
         ascensions = False
         # print(f"ascenscion start size{len(ascension_start)} ascenscion end size{len(ascension_end)}")
         # Finding the max and min frame counts of the ascension
-        for i in range(len(change_in_temp)-1):
+        for i in range(len(change_in_temp) - 1):
             temp_ascension = []
-            for j in range(len(ascension_start)-1):
-                if (change_in_temp[i] + window) >= ascension_start[j] and (change_in_temp[i] - window <= ascension_start[j]):
+            for j in range(len(ascension_start) - 1):
+                if (change_in_temp[i] + window) >= ascension_start[j] and (
+                        change_in_temp[i] - window <= ascension_start[j]):
                     temp_ascension.append(ascension_start[j])
-            for j in range(len(ascension_end)-1):
-                if (change_in_temp[i] + window) >= ascension_end[j] and (change_in_temp[i] - window <= ascension_end[j]):
+            for j in range(len(ascension_end) - 1):
+                if (change_in_temp[i] + window) >= ascension_end[j] and (
+                        change_in_temp[i] - window <= ascension_end[j]):
                     temp_ascension.append(ascension_end[j])
 
             if temp_ascension == []:
@@ -114,19 +127,23 @@ class BlackbodyCalibration(CalibrationData):
             else:
                 begin_average = min(temp_ascension)
                 end_average = max(temp_ascension)
-                if (change_in_temp[i+1] > change_in_temp[i] + window):
+                if (change_in_temp[i + 1] > change_in_temp[i] + window):
                     if ascensions == False:
-                        array_of_avg_coords = np.array([0, begin_average, end_average])
+                        array_of_avg_coords = np.array(
+                            [0, begin_average, end_average])
                         ascensions = True
                     else:
-                        array_of_avg_coords = np.append(array_of_avg_coords,[begin_average,end_average])
+                        array_of_avg_coords = np.append(
+                            array_of_avg_coords, [begin_average, end_average])
 
         array_of_avg_coords = np.append(array_of_avg_coords, len(means))
         if progress_cb:
             progress_cb(phase="ascension", current=1, total=1)
         return array_of_avg_coords
 
-    def generate_coefficients(self, image_stack, array_of_avg_coords, blackbody_temperature, tempurature_step, rsr, progress_cb):
+    def generate_coefficients(self, image_stack, array_of_avg_coords,
+                              blackbody_temperature, tempurature_step, rsr,
+                              progress_cb):
         """
         Calculates gain and bias coefficients for each pixel in a fully vectorized manner.
 
@@ -161,18 +178,21 @@ class BlackbodyCalibration(CalibrationData):
 
         # Preallocate array size
         step_averages = np.zeros((rows, cols, n_steps))
-        cal_array = np.zeros((rows,cols,2))
+        cal_array = np.zeros((rows, cols, 2))
 
         for step in range(n_steps):
-            start = array_of_avg_coords[2*step]
-            end = array_of_avg_coords[2*step + 1]
+            start = array_of_avg_coords[2 * step]
+            end = array_of_avg_coords[2 * step + 1]
 
             # Compute mean over time for all pixels in the step window
-            step_averages[:, :, step] = np.mean(image_stack[:, :, start:end],axis=2)
+            step_averages[:, :, step] = np.mean(image_stack[:, :, start:end],
+                                                axis=2)
 
             # Optional: update GUI progress after each step
             if progress_cb:
-                progress_cb(phase="computing_steps", current=step+1, total=n_steps)
+                progress_cb(phase="computing_steps",
+                            current=step + 1,
+                            total=n_steps)
 
         # Determining usage of Relative Spectral Response Function
         if rsr:
@@ -184,11 +204,12 @@ class BlackbodyCalibration(CalibrationData):
 
         ### GENERATING BAND RADIANCES FOR EACH TEMP STEP ###
         band_radiances = np.zeros(n_steps)
-        temperatures = blackbody_temperature + np.arange(n_steps) * tempurature_step # [K]
+        temperatures = blackbody_temperature + np.arange(
+            n_steps) * tempurature_step  # [K]
         bb = Blackbody()
 
         for i, temp in enumerate(temperatures):
-            bb.absolute_temperature = temp # [K]
+            bb.absolute_temperature = temp  # [K]
             if rsr:
                 band_radiances[i] = bb.band_radiance(wavelengths, response)
             else:
@@ -197,12 +218,14 @@ class BlackbodyCalibration(CalibrationData):
         ### PERFORMING LINEAR REGRESSION ###
         for row in range(image_stack.shape[0]):
             for col in range(image_stack.shape[1]):
-                gain, bias = np.polyfit(step_averages[row,col,:], band_radiances[:], 1)
+                gain, bias = np.polyfit(step_averages[row, col, :],
+                                        band_radiances[:], 1)
                 cal_array[row, col, 0] = gain
                 cal_array[row, col, 1] = bias
 
         return cal_array
-    
+
+
 if __name__ == "__main__":
     import numpy as np
     from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
@@ -213,7 +236,10 @@ if __name__ == "__main__":
     import scipy.constants as const
     import math
 
-    txt_content = np.loadtxt("/home/cjw9009/Desktop/suas_data/flir_boson_with_13mm_45fov.txt", skiprows=1, delimiter=',')
+    txt_content = np.loadtxt(
+        "/home/cjw9009/Desktop/suas_data/flir_boson_with_13mm_45fov.txt",
+        skiprows=1,
+        delimiter=',')
     wavelengths = txt_content[:, 0]
     response = txt_content[:, 1]
 
@@ -224,15 +250,14 @@ if __name__ == "__main__":
 
     print("Starting BlackbodyCalibration test...")
 
-    # Build validated config 
+    # Build validated config
     config = BlackbodyCalibrationConfig(
         directory=test_directory,
         filetype=test_filetype,
-        blackbody_temperature=283.15,   # K
-        temperature_step=5.0,           # K
+        blackbody_temperature=283.15,  # K
+        temperature_step=5.0,  # K
         rsr=test_rsr,
-        progress_cb=None
-    )
+        progress_cb=None)
     print("Config Validated")
     # Create calibration via factory
     calib = CalibrationDataFactory.create(config)
@@ -242,26 +267,25 @@ if __name__ == "__main__":
     print(f"Coefficient array shape: {calib.coefficients.shape}")
 
     # Save coefficients
-    np.save(
-        "2025.npy",
-        calib.coefficients
-    )
-   
+    np.save("2025.npy", calib.coefficients)
+
     stack = calib.image_stack
-    array_of_avg_coords = calib.find_ascensions(stack, 3, 0.001,[])
+    array_of_avg_coords = calib.find_ascensions(stack, 3, 0.001, [])
     # multiply DC by gain, add bias to get per pixel radiance
 
     # NEDT Calculation ### ADD CODE HERE
-    
 
-    temps = [283.15, 288.15, 293.15, 298.15, 303.15, 308.15, 313.15, 318.15, 323.15, 328.15, 333.15, 338.15, 343.15]
+    temps = [
+        283.15, 288.15, 293.15, 298.15, 303.15, 308.15, 313.15, 318.15, 323.15,
+        328.15, 333.15, 338.15, 343.15
+    ]
     NEDT_array = np.empty((stack.shape[0], stack.shape[1], len(temps)))
-    plancks_constant = const.h # 6.62607015e-34 [Joules*Seconds] 
-    speed_of_light_constant = const.c # 299792458.0 [Meters/Second]
-    boltzmann_constant = const.k # 1.380649e-23 [Joules/Kelvin]
+    plancks_constant = const.h  # 6.62607015e-34 [Joules*Seconds]
+    speed_of_light_constant = const.c  # 299792458.0 [Meters/Second]
+    boltzmann_constant = const.k  # 1.380649e-23 [Joules/Kelvin]
 
-    wavelengths = wavelengths*0.000001
-    numerator = 2*plancks_constant*speed_of_light_constant*speed_of_light_constant
+    wavelengths = wavelengths * 0.000001
+    numerator = 2 * plancks_constant * speed_of_light_constant * speed_of_light_constant
 
     # Precompute wavelength-only constants (done ONCE)
     wl = wavelengths
@@ -272,15 +296,16 @@ if __name__ == "__main__":
 
     for r in range(stack.shape[0]):
         for c in range(stack.shape[1]):
-            
-            individual_pixel = stack[r,c,:]
-            individual_pixel_rad = individual_pixel * calib.coefficients[r,c,0] + calib.coefficients[r,c,1]
+
+            individual_pixel = stack[r, c, :]
+            individual_pixel_rad = individual_pixel * calib.coefficients[
+                r, c, 0] + calib.coefficients[r, c, 1]
             pixel_rad = individual_pixel_rad  # alias (faster lookup)
 
             for i, To in enumerate(temps):
 
-                start = array_of_avg_coords[2*i]
-                stop  = array_of_avg_coords[2*i + 1]
+                start = array_of_avg_coords[2 * i]
+                stop = array_of_avg_coords[2 * i + 1]
 
                 diffs = np.diff(pixel_rad[start:stop])
 
@@ -297,43 +322,24 @@ if __name__ == "__main__":
 
                 dLdT = (numerator_dL / denominator) * resp
 
-                int_dLdT = integrate.simpson(dLdT, wl)
+                int_dLdT = integrate.simpson(dLdT, wavelengths)
 
                 NEDT_array[r, c, i] = sigma / int_dLdT
-
 
     print(f"{NEDT_array.shape}")
 
     np.save("20251202_1400_fullimage_bbrun_NEDT_array_chat.npy", NEDT_array)
-    mean_NEDT = np.mean(NEDT_array,axis=(0,1))
+    mean_NEDT = np.mean(NEDT_array, axis=(0, 1))
     print(f"Size of mean_NEDT{mean_NEDT.shape}")
-    plt.scatter(range(10,71,5), mean_NEDT)
+    plt.scatter(range(10, 71, 5), mean_NEDT)
     plt.title("Average NEDT at each step")
     plt.xlabel("Temperature in Kelvin (Step Temperature)")
     plt.ylabel("Mean NEDT")
     plt.show()
-    
-
-
-
-
-
-
-
-
-        
-
-        
-
-
-
-
-
-
 
     # temp_list = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
     # NEDT_array = np.empty((stack.shape[0], stack.shape[1], len(temp_list)))
-    
+
     # for r in range(stack.shape[0]):
     #     for c in range(stack.shape[1]):
     #         # multiply DC by gain, add bias to get per pixel radiance
@@ -348,7 +354,7 @@ if __name__ == "__main__":
     #     for i in range(start, stop-1,1):
     #         diff = individual_pixel_radiance[i+1]-individual_pixel_radiance[i]
     #         avg_diffs += diff
-        
+
     #     print(f"Stop {stop} Start {start}")
     #     if (start-stop) != 0:
     #         avg_diffs = avg_diffs / (stop-start)
@@ -364,7 +370,7 @@ if __name__ == "__main__":
     #     else:
     #         avg_diffs = 0
     #         print(f"start-stop-2 was zero")
-        
+
     #     h = 6.62607015e-34
     #     c_speed = 299792458
     #     k = 1.380649e-23
@@ -384,7 +390,3 @@ if __name__ == "__main__":
     # plt.xlabel("Temperature in Kelvin (Step Temperature)")
     # plt.ylabel("Mean NEDT")
     # plt.show()
-
-
-
-

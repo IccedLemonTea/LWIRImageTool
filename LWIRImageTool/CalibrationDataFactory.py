@@ -8,7 +8,7 @@ from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
 
 
 class CalibrationDataFactory(object):
-   """
+    """
    title::
       CalibrationDataFactory
 
@@ -47,23 +47,17 @@ class CalibrationDataFactory(object):
       risk of using the source code.
    """
 
+    @staticmethod
+    def create(config: Union[BlackbodyCalibrationConfig]
+               ):  # Insert other modes of Cal here
+        from .BlackbodyCalibration import BlackbodyCalibration
+        if isinstance(config, BlackbodyCalibrationConfig):
+            return BlackbodyCalibration(config)
 
-   @staticmethod
-   def create(config: Union[BlackbodyCalibrationConfig]): # Insert other modes of Cal here
-      from .BlackbodyCalibration import BlackbodyCalibration
-      if isinstance(config, BlackbodyCalibrationConfig):
-         return BlackbodyCalibration(config)
-
-      raise ValueError(f"Unsupported calibration config: {type(config)}")
-         
-      
+        raise ValueError(f"Unsupported calibration config: {type(config)}")
 
 
 if __name__ == '__main__':
-   import cv2
-   import os.path
-   import spectral
-
-
-
-      
+    import cv2
+    import os.path
+    import spectral
