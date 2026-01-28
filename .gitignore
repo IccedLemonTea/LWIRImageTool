@@ -1,3 +1,6 @@
 /__pycache__
 /LWIRImageTool.egg-info
 /LWIRImageTool/__pycache__
+
+*.png
+*.npy

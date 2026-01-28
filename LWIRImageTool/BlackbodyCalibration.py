@@ -335,6 +335,7 @@ if __name__ == "__main__":
     plt.title("Average NEDT at each step")
     plt.xlabel("Temperature in Kelvin (Step Temperature)")
     plt.ylabel("Mean NEDT")
+    plt.savefig("Plot of updated NEDT")
     plt.show()
 
     # temp_list = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
