@@ -1,5 +1,6 @@
 import numpy as np
-import LWIRImageTool
+from .ImageDataFactory import ImageDataFactory
+from .ImageDataConfig import ImageDataConfig
 import os
 
 
@@ -24,7 +25,7 @@ def stack_images(directory, filetype, progress_cb=None):
         3D array containing stacked images with shape (rows, cols, num_frames).
     """
     ### PREALLOCATING SPACE FOR VECTORS AND SORTING DIR FOR IMAGES ###
-    factory = LWIRImageTool.ImageDataFactory()
+    factory = ImageDataFactory()
     file_list = sorted(os.listdir(directory))
     image_list = []
 
@@ -32,8 +33,8 @@ def stack_images(directory, filetype, progress_cb=None):
         if factory.is_valid_image_file(f, filetype):
             image_list.append(f)
 
-    first_src = factory.create_from_file(
-        os.path.join(directory, image_list[0]), filetype)
+    config = ImageDataConfig(filename = os.path.join(directory, image_list[0]), fileformat= filetype)
+    first_src = factory.create_from_file(config)
 
     rows, cols = first_src.raw_counts.shape
     num_frames = len(image_list)
@@ -51,7 +52,8 @@ def stack_images(directory, filetype, progress_cb=None):
     # Stacking all images in the target directory
     for idx, file in enumerate(image_list):
         file_path = os.path.join(directory, file)
-        src = factory.create_from_file(file_path, filetype)
+        config.filename = file_path
+        src = factory.create_from_file(config)
         image_stack[:, :, idx] = np.array(src.raw_counts)
 
         # Optional callback for GUI
