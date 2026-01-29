@@ -20,8 +20,14 @@ class Blackbody(BaseModel):
     )
 
     def total_radiance(self) -> float:
-        """ 
-        Calculates the total radiance of a blackbody with the absolute temperature set in the object
+        """
+        Computes the total hemispherical radiance of a blackbody using the
+        Stefan-Boltzmann law.
+
+        Returns
+        -------
+        total_radiance : float
+            Total blackbody radiance in units of W/m^2/sr.
         """
         stefan_boltzmann_constant = const.sigma  # [W/m^2/K^4]
 
@@ -35,9 +41,23 @@ class Blackbody(BaseModel):
         rsr: Optional[Sequence[float]] = None
     ) -> np.ndarray:
         """
-        Computes the spectral radiance of the blackbody object given an interval of wavelengths to compute over
-            wavelengths(list or 1D-np.array) must be in microns
-            rsr(list or 1D-np.array) relative spectral response of the system
+        Computes the spectral radiance of a blackbody using Planck’s law.
+
+        Radiance is evaluated at each wavelength and optionally weighted
+        by a relative spectral response (RSR) function.
+
+        Parameters
+        ----------
+        wavelengths : list or np.ndarray
+            Wavelength values in microns.
+        rsr : list or np.ndarray, optional
+            Relative spectral response of the sensor system. Must be the
+            same length as `wavelengths`.
+
+        Returns
+        -------
+        spectral_radiance : np.ndarray
+            Spectral radiance in units of W/m^2/sr/micron.
         """
 
         wavelengths = np.asarray(wavelengths, dtype=float)
@@ -77,9 +97,23 @@ class Blackbody(BaseModel):
         rsr: Optional[Sequence[float]] = None
     ) -> float:
         """
-        Computes the integrated band radiance of the blackbody object given an interval of wavelengths to compute over
-            wavelengths(list or 1D-np.array) must be in microns
-            rsr(list or 1D-np.array) relative spectral response of the system
+        Computes the integrated band radiance over a wavelength interval.
+
+        The spectral radiance is numerically integrated across the provided
+        wavelength range. If an RSR is supplied, the result is normalized
+        by the integrated response.
+
+        Parameters
+        ----------
+        wavelengths : list or np.ndarray
+            Wavelength values in microns.
+        rsr : list or np.ndarray, optional
+            Relative spectral response of the sensor system.
+
+        Returns
+        -------
+        band_radiance : float
+            Integrated band radiance in units of W/m^2/sr.
         """
 
         wavelengths = np.asarray(wavelengths, dtype=float)
@@ -90,9 +124,9 @@ class Blackbody(BaseModel):
 
         if rsr is not None:
             rsr = integrate.simpson(rsr, wavelengths)
-            int_radiance = int_radiance/rsr
+            int_radiance = int_radiance/rsr # Divide by RSR to normalize and retain units of /micron
             
-        return int_radiance  # [W/m^2/sr]
+        return int_radiance  # [W/m^2/sr/micron]
     
 if __name__ == "__main__":
     from .Blackbody import Blackbody
