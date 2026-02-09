@@ -75,15 +75,18 @@ class BlackbodyCalibration(CalibrationData):
         mean_first_deriv = np.mean(first_derivative)
         mean_second_deriv = np.mean(second_derivative)
 
+        # print(f"The mean of the first deriv is {mean_first_deriv}, and {mean_second_deriv} for the second deriv")
+        # print(f"99% Of the data lies within {3*stdev_first_deriv} for the first deriv, and {3*stdev_second_deriv} for the second deriv")
+
+
         ### CALCULATING THE REGIONS OF ASCENSION ###
         # Vector to hold all values of when the 1st derivative exceeds 3 stdevs of the mean
-        # Means that the DC of the scene is changing --> new temperature being reached in the cal run
+        # Means that the DC of the scene is changing --> new temperature being reached in the cal run 
         # e.g. ascends to a new temperature
         change_in_temp = [0]
 
         for i in range(first_derivative.shape[0]):
-            if first_derivative[i] >= (deriv_threshold * stdev_first_deriv +
-                                       mean_first_deriv):
+            if first_derivative[i] >= (3*stdev_first_deriv + mean_first_deriv):
                 if change_in_temp is not None:
                     change_in_temp.append(i)
                 else:
@@ -93,33 +96,30 @@ class BlackbodyCalibration(CalibrationData):
         # Adding end point of derivative vector
         change_in_temp.append(first_derivative.shape[0])
 
-        # Vector to hold all derivative values that
-        # signal the beginning and end of the temperature change
+
+        # Vector to hold all derivative values that 
+        # signal the beginning and end of the temperature change 
         # portion of the blackbody run (ASCENSION)
         ascension_start = []
         ascension_end = []
         for i in range(second_derivative.shape[0]):
-            if second_derivative[i] >= (deriv_threshold * stdev_second_deriv +
-                                        mean_second_deriv):
+            if second_derivative[i] >= (3*stdev_second_deriv + mean_second_deriv):
                 ascension_start.append(i)
-            if second_derivative[i] <= (-deriv_threshold * stdev_second_deriv +
-                                        mean_second_deriv):
+            if second_derivative[i] <= (-3*stdev_second_deriv + mean_second_deriv):
                 ascension_end.append(i)
 
         # Window searching 1% of the data size
-        window = int(len(means)) * window_fraction
+        window = int(len(means))*0.01 
         ascensions = False
         # print(f"ascenscion start size{len(ascension_start)} ascenscion end size{len(ascension_end)}")
         # Finding the max and min frame counts of the ascension
-        for i in range(len(change_in_temp) - 1):
+        for i in range(len(change_in_temp)-1):
             temp_ascension = []
-            for j in range(len(ascension_start) - 1):
-                if (change_in_temp[i] + window) >= ascension_start[j] and (
-                        change_in_temp[i] - window <= ascension_start[j]):
+            for j in range(len(ascension_start)):
+                if (change_in_temp[i] + window) >= ascension_start[j] and (change_in_temp[i] - window <= ascension_start[j]):
                     temp_ascension.append(ascension_start[j])
-            for j in range(len(ascension_end) - 1):
-                if (change_in_temp[i] + window) >= ascension_end[j] and (
-                        change_in_temp[i] - window <= ascension_end[j]):
+            for j in range(len(ascension_end)):
+                if (change_in_temp[i] + window) >= ascension_end[j] and (change_in_temp[i] - window <= ascension_end[j]):
                     temp_ascension.append(ascension_end[j])
 
             if temp_ascension == []:
@@ -127,14 +127,12 @@ class BlackbodyCalibration(CalibrationData):
             else:
                 begin_average = min(temp_ascension)
                 end_average = max(temp_ascension)
-                if (change_in_temp[i + 1] > change_in_temp[i] + window):
+                if (change_in_temp[i+1] > change_in_temp[i] + window):
                     if ascensions == False:
-                        array_of_avg_coords = np.array(
-                            [0, begin_average, end_average])
+                        array_of_avg_coords = np.array([0, begin_average, end_average])
                         ascensions = True
                     else:
-                        array_of_avg_coords = np.append(
-                            array_of_avg_coords, [begin_average, end_average])
+                        array_of_avg_coords = np.append(array_of_avg_coords,[begin_average,end_average])
 
         array_of_avg_coords = np.append(array_of_avg_coords, len(means))
         if progress_cb:
