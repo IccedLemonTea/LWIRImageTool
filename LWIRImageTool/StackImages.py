@@ -6,24 +6,47 @@ import os
 
 def stack_images(directory, filetype, progress_cb=None):
     """
-    Reads all images from a directory and stacks them along a third dimension.
+    Load all valid images from a directory and stack them along a time axis.
 
-    The third dimension corresponds to time, ordered by the file timestamps.
+    Files are sorted lexicographically (which preserves chronological order
+    when FLIR timestamp filenames are used).  The output array dtype matches
+    the dtype of the first image loaded.
 
     Parameters
     ----------
     directory : str
-        Path to the directory containing blackbody images.
+        Path to the directory containing the image sequence.
     filetype : str
-        Type/format of the image files.
-    progress_cb : callable, optional
-        Callback function for GUI progress updates.
+        Image format identifier passed to ``ImageDataFactory``.
+        Supported values: ``'rjpeg'``, ``'envi'``.
+    progress_cb : callable or None, optional
+        Progress callback invoked as
+        ``progress_cb(phase='loading', current=int, total=int)``
+        after each frame is loaded.  ``None`` disables callbacks.
+        Default is ``None``.
 
     Returns
     -------
     image_stack : np.ndarray
-        3D array containing stacked images with shape (rows, cols, num_frames).
+        3-D array of stacked frames, shape ``(rows, cols, num_frames)``.
+        Dtype matches the raw counts dtype of the source images.
+
+    Raises
+    ------
+    IndexError
+        If no valid image files are found in *directory*.
+    ValueError
+        If any image file fails validation inside ``ImageDataFactory``.
+
+    Examples
+    --------
+    >>> stack = stack_images("/data/cal_run", filetype="rjpeg")
+    >>> stack.shape
+    (512, 640, 1200)
+    >>> stack.dtype
+    dtype('uint16')
     """
+    
     ### PREALLOCATING SPACE FOR VECTORS AND SORTING DIR FOR IMAGES ###
     factory = ImageDataFactory()
     file_list = sorted(os.listdir(directory))

@@ -3,34 +3,57 @@
 # Date : 01/14/2026
 # File : BlackbodyCalibrationConfig.py
 
-from pydantic import BaseModel, Field
-from typing import Optional, Callable
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, Callable, Union
+import numpy as np
 
 
 class BlackbodyCalibrationConfig(BaseModel):
     """
-    Object for setting all necessary values in a blackbody calibration run
+    Configuration for a blackbody calibration run.
 
-    Variables
+    Pass an instance of this class to ``CalibrationDataFactory.create()``
+    to produce a ``BlackbodyCalibration`` object.
+
+    Parameters
     ----------
     directory : str
-        Path to the directory containing blackbody images.
-    filetype : str
-        Type/format of the image files (e.g., 'rjpeg', 'envi').
+        Path to the directory containing the blackbody image sequence.
+    filetype : str, optional
+        Image file format.  Supported values: ``'rjpeg'``, ``'envi'``.
+        Default is ``'rjpeg'``.
     blackbody_temperature : float
-        Temperature that blackbody starts the run at in [K]
+        Starting blackbody temperature in Kelvin.  Must be > 0.
     temperature_step : float
-        Temperature value that the blackbody changes by between each step in [K]
-    rsr : str or None
-        Path to the RSR file containing spectral response and wavelengths. If None, 
-        default wavelengths are used. (8-14 microns)
-    progress_cb : callable, optional
-        Callback function for progress updates. Called with `phase`, `current`, and `total`.
-    deriv_threshold : int
-        Factor to distinguish how far from the stdev the derivative being checked is. Default is 3
-    window_fraction : float
-        Fraction of data to be searched when finding ascensions. Default is 0.001
+        Temperature increment between successive blackbody steps in Kelvin.
+        Must be > 0.
+    rsr : str, np.ndarray, or None, optional
+        Relative spectral response definition.
+
+        * ``str``  — path to a two-column ``.txt`` file (wavelength [µm],
+          response); loaded with ``np.loadtxt(..., skiprows=1, delimiter=',')``.
+        * ``np.ndarray`` — shape ``(2, N)`` where ``[0, :]`` is wavelength
+          [µm] and ``[1, :]`` is the normalised response.
+        * ``None`` — flat response from 8-14 µm assumed.
+
+        Default is ``None``.
+    progress_cb : callable or None, optional
+        Callback for progress updates.  Called as
+        ``progress_cb(phase, current, total)`` where *phase* is a string
+        label (e.g. ``'loading'``, ``'calibrating'``), *current* and *total*
+        are integers.  Default is ``None``.
+    chunk_fraction : float, optional
+        Fraction of the signal length used for chunk averaging.
+        Must be in ``(0, 1]``.  Default is ``0.01``.
+    deriv_threshold : float, optional
+        Standard-deviation multiplier used when detecting derivative peaks
+        during ascension detection.  Default is ``3``.
+    window_fraction : float, optional
+        Fraction of the total frame count used as the search window when
+        matching derivative peaks to temperature steps.  Default is ``0.001``.
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     directory: str
     filetype: str = "rjpeg"
 
@@ -40,7 +63,8 @@ class BlackbodyCalibrationConfig(BaseModel):
                                     gt=0,
                                     description="Temperature step [K]")
 
-    rsr: Optional[str] = None
+    rsr: Optional[Union[str, np.ndarray]] = None
+
     progress_cb: Optional[Callable] = None
 
     chunk_fraction: float = Field(default=0.01, gt=0, le=1)

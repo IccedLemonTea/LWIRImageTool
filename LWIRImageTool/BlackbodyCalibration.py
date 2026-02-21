@@ -1,7 +1,3 @@
-### Blackbody Calibration Class ###
-# Author : Cooper White (cjw9009@g.rit.edu)
-# Date : 12/23/2025
-# File : Blackbody.py
 
 import numpy as np
 from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
@@ -12,10 +8,47 @@ from .Blackbody import Blackbody
 
 class BlackbodyCalibration(CalibrationData):
     """
-    Performs blackbody calibration of LWIR images.
+    Blackbody calibration of LWIR imagery.
 
-    This class reads in a sequence of blackbody images, detects temperature 
-    ascensions, and calculates gain and bias coefficients for each pixel.
+    Stacks a sequence of blackbody images, detects temperature-step
+    boundaries (ascensions), and fits a per-pixel linear model mapping
+    digital counts to band-integrated radiance.
+
+    The calibrated coefficients satisfy::
+
+        radiance[r, c] = gain[r, c] * DC[r, c] + bias[r, c]
+
+    where ``gain = coefficients[r, c, 0]`` and
+    ``bias = coefficients[r, c, 1]``.
+
+    Parameters
+    ----------
+    config : BlackbodyCalibrationConfig
+        Fully validated configuration object.
+
+    Attributes
+    ----------
+    image_stack : np.ndarray
+        Raw stacked images, shape ``(rows, cols, frames)``.
+    coefficients : np.ndarray
+        Per-pixel gain/bias array, shape ``(rows, cols, 2)``.
+    directory : str
+        Source directory used for this calibration run.
+    blackbody_temperature : float
+        Starting blackbody temperature [K].
+    temperature_step : float
+        Temperature increment per step [K].
+    rsr : str, np.ndarray, or None
+        RSR definition used (mirrors ``config.rsr``).
+    deriv_threshold : float
+        Derivative threshold multiplier used for ascension detection.
+    window_fraction : float
+        Window fraction used for ascension detection.
+
+    See Also
+    --------
+    BlackbodyCalibrationConfig : Configuration dataclass for this class.
+    CalibrationDataFactory : Recommended entry point for construction.
     """
 
     def __init__(self, config: BlackbodyCalibrationConfig):
@@ -34,6 +67,14 @@ class BlackbodyCalibration(CalibrationData):
             self.image_stack, _array_of_avg_coords,
             config.blackbody_temperature, config.temperature_step, config.rsr,
             config.progress_cb)
+        
+        # Asigning config vars to object os users can see how cal was created.
+        self.directory             = config.directory
+        self.blackbody_temperature = config.blackbody_temperature
+        self.temperature_step      = config.temperature_step
+        self.rsr                   = config.rsr
+        self.deriv_threshold       = config.deriv_threshold
+        self.window_fraction       = config.window_fraction
 
     def find_ascensions(self,
                         image_stack,
@@ -41,24 +82,32 @@ class BlackbodyCalibration(CalibrationData):
                         window_fraction=0.001,
                         progress_cb=None):
         """
-        Detects frame indices corresponding to temperature steps (ascensions) 
-        using the mean signal over all pixels.
+        Detect frame indices bounding each temperature step (ascension).
+
+        Computes the spatial mean signal over all pixels for every frame,
+        then uses first- and second-derivative thresholding to locate the
+        start and end of each temperature transition.
 
         Parameters
         ----------
         image_stack : np.ndarray
-            3D array of stacked images (rows, cols, num_frames).
-        chunk_percentage : float
-            Fraction of signal length used for chunk averaging to smooth data.
-        deriv_threshold : float
-            Multiplier for standard deviation when detecting derivative peaks.
-        window_fraction : float
-            Fraction of data length for matching derivative peaks to temperature changes.
+            Stacked images, shape ``(rows, cols, frames)``.
+        deriv_threshold : float, optional
+            Standard-deviation multiplier for first-derivative peak
+            detection.  Default is ``3``.
+        window_fraction : float, optional
+            Fraction of total frames used as the search window when
+            associating derivative peaks with temperature steps.
+            Default is ``0.001``.
+        progress_cb : callable or None, optional
+            Progress callback.  Default is ``None``.
 
         Returns
         -------
         array_of_avg_coords : np.ndarray
-            Array of start and end indices of temperature steps in frames.
+            1-D array of frame indices alternating between step-start and
+            step-end positions.  Length is ``2 * n_steps + 1`` (the final
+            element is the last frame index).
         """
 
         # Optional: update GUI progress after each step
@@ -143,27 +192,33 @@ class BlackbodyCalibration(CalibrationData):
                               blackbody_temperature, tempurature_step, rsr,
                               progress_cb):
         """
-        Calculates gain and bias coefficients for each pixel in a fully vectorized manner.
+        Fit per-pixel gain and bias coefficients via linear regression.
 
-        Regional averages are computed between ascension intervals, and linear regression 
-        is applied to map counts to radiance.
+        For each pixel, computes the mean digital count within each
+        temperature-step window, integrates the Planck function against the
+        RSR to get band radiance at each step temperature, then fits a
+        first-order polynomial (least squares) mapping counts to radiance.
 
         Parameters
         ----------
         image_stack : np.ndarray
-            3D array of stacked images (rows, cols, num_frames).
+            Stacked images, shape ``(rows, cols, frames)``.
         array_of_avg_coords : np.ndarray
-            Array of start and end indices of temperature steps (ascensions).
-        rsr : str or None
-            Path to RSR file for spectral weighting. If None, default wavelengths are used.
-        progress_cb : callable, optional
-            Callback function for GUI progress updates.
+            Step boundary indices from ``find_ascensions()``.
+        blackbody_temperature : float
+            Starting temperature [K].
+        temperature_step : float
+            Temperature increment per step [K].
+        rsr : str, np.ndarray, or None
+            RSR definition (see ``BlackbodyCalibrationConfig.rsr``).
+        progress_cb : callable or None
+            Progress callback.
 
         Returns
         -------
         cal_array : np.ndarray
-            3D array of calibration coefficients with shape (rows, cols, 2)
-            where [:,:,0] is gain and [:,:,1] is bias.
+            Per-pixel coefficients, shape ``(rows, cols, 2)``.
+            ``cal_array[:, :, 0]`` is gain, ``cal_array[:, :, 1]`` is bias.
         """
 
         # Optional: update GUI progress after each step
@@ -192,13 +247,17 @@ class BlackbodyCalibration(CalibrationData):
                             current=step + 1,
                             total=n_steps)
 
-        # Determining usage of Relative Spectral Response Function
-        if rsr:
+        if isinstance(rsr, str):
             txt_content = np.loadtxt(rsr, skiprows=1, delimiter=',')
             wavelengths = txt_content[:, 0]
             response = txt_content[:, 1]
+        elif isinstance(rsr, np.ndarray):
+            wavelengths = rsr[0, :]
+            response = rsr[1, :]
         else:
             wavelengths = np.linspace(8, 14, 10000)
+            response = np.ones_like(wavelengths)
+
 
         ### GENERATING BAND RADIANCES FOR EACH TEMP STEP ###
         band_radiances = np.zeros(n_steps)
@@ -208,10 +267,7 @@ class BlackbodyCalibration(CalibrationData):
 
         for i, temp in enumerate(temperatures):
             bb.absolute_temperature = temp  # [K]
-            if rsr:
-                band_radiances[i] = bb.band_radiance(wavelengths, response)
-            else:
-                band_radiances[i] = bb.band_radiance(wavelengths)
+            band_radiances[i] = bb.band_radiance(wavelengths, response)
 
         ### PERFORMING LINEAR REGRESSION ###
         for row in range(image_stack.shape[0]):

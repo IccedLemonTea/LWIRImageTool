@@ -1,7 +1,3 @@
-### ImageDataConfig Class ###
-# Author : Cooper White (cjw9009@g.rit.edu)
-# Date : 01/28/2026
-# File : ImageDataConfig.py
 
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal
@@ -11,16 +7,19 @@ ImageFormat = Literal["envi", "rjpeg"]
 
 class ImageDataConfig(BaseModel):
     """
-    Object for setting all necessary values in an image
+    Configuration for loading a single LWIR image file.
 
-    Variables
+    Pass an instance of this class to ``ImageDataFactory.create_from_file()``.
+
+    Parameters
     ----------
     filename : str
-        Path to the file containing the image the user would like to load.
-    fileformat : str
-        Type/format of the image files (e.g., 'rjpeg', 'envi').
-    bitdepth : int
-        bitdepth of the image
+        Absolute or relative path to the image file.  Must be a non-empty
+        string; validated on construction.
+    fileformat : {'rjpeg', 'envi'}, optional
+        Image file format.  Default is ``'rjpeg'``.
+    bitdepth : int, optional
+        Bit depth of the image data.  Must be >= 1.  Default is ``16``.
     """
     filename: str = Field(..., description="Path to the image file")
     fileformat: ImageFormat = Field(

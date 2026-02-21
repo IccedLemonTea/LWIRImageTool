@@ -1,60 +1,61 @@
-### CalibrationDataFactory Class ###
-# Author : Cooper White
-# Date : 11/07/2025
-# File : CalibrationDataFactory.py
 
 from typing import Union
 from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
 
 
 class CalibrationDataFactory(object):
-    """
-   title::
-      CalibrationDataFactory
-
-   description::
-      A public factory class for creating source-agnostic calibration 
-      data objects. Image files from various sources will be read 
-      and used to produce source-agnostic calibration data objects
-
-   attributes::
-      None
-
-   methods::
-
-   author::
-      Cooper White
-
-   copyright::
-
-   license::
-
-   version::
-      1.0.0
-
-   disclaimer::
-      This source code is provided "as is" and without warranties as to 
-      performance or merchantability. The author and/or distributors of 
-      this source code may have made statements about this source code. 
-      Any such statements do not constitute warranties and shall not be 
-      relied on by the user in deciding whether to use this source code.
-      
-      This source code is provided without any express or implied warranties 
-      whatsoever. Because of the diversity of conditions and hardware under 
-      which this source code may be used, no warranty of fitness for a 
-      particular purpose is offered. The user is advised to test the source 
-      code thoroughly before relying on it. The user must assume the entire 
-      risk of using the source code.
    """
+    Factory for creating source-agnostic calibration data objects.
 
-    @staticmethod
-    def create(config: Union[BlackbodyCalibrationConfig]
-               ):  # Insert other modes of Cal here
-        from .BlackbodyCalibration import BlackbodyCalibration
-        if isinstance(config, BlackbodyCalibrationConfig):
-            return BlackbodyCalibration(config)
+    Dispatches to the correct ``CalibrationData`` subclass based on the
+    type of config object provided.  Adding a new calibration method only
+    requires adding a new ``isinstance`` branch here — callers are
+    unaffected.
 
-        raise ValueError(f"Unsupported calibration config: {type(config)}")
+    Methods
+    -------
+    create(config)
+        Construct and return a ``CalibrationData`` subclass instance.
+
+    Examples
+    --------
+    >>> config = BlackbodyCalibrationConfig(
+    ...     directory="/data/cal_run",
+    ...     blackbody_temperature=283.15,
+    ...     temperature_step=5.0,
+    ... )
+    >>> cal = CalibrationDataFactory.create(config)
+    >>> cal.coefficients.shape
+    (512, 640, 2)
+    """
+
+   @staticmethod
+   def create(config: Union[BlackbodyCalibrationConfig]):  # Insert other modes of Cal here
+      """
+        Construct a ``CalibrationData`` object from a config.
+
+        Parameters
+        ----------
+        config : BlackbodyCalibrationConfig
+            A validated calibration configuration.  Additional config types
+            can be added in future without changing this interface.
+
+        Returns
+        -------
+        CalibrationData
+            A fully populated calibration data object (currently always a
+            ``BlackbodyCalibration`` instance).
+
+        Raises
+        ------
+        ValueError
+            If *config* is not a recognised configuration type.
+       """
+      from .BlackbodyCalibration import BlackbodyCalibration
+      if isinstance(config, BlackbodyCalibrationConfig):
+         return BlackbodyCalibration(config)
+
+      raise ValueError(f"Unsupported calibration config: {type(config)}")
 
 
 if __name__ == '__main__':
