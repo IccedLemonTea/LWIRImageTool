@@ -1,15 +1,17 @@
 from .ImageDataConfig import ImageDataConfig
 from .ENVI import ENVI
 from .RJPEG import RJPEG
+from .SFMOV import SFMOV
 
 
 class ImageDataFactory:
     """
     Factory for creating source-agnostic ``ImageData`` objects.
 
-    Dispatches to the correct reader (``RJPEG``, ``ENVI``, …) based on
-    the ``fileformat`` field of the supplied config.  Callers always
-    receive an ``ImageData`` instance regardless of the underlying format.
+    Dispatches to the correct reader (``RJPEG``, ``ENVI``, ``PySFMov``)
+    based on the ``fileformat`` field of the supplied config.  Callers
+    always receive an ``ImageData`` instance regardless of the underlying
+    format.
 
     Methods
     -------
@@ -24,6 +26,11 @@ class ImageDataFactory:
     >>> img = ImageDataFactory.create_from_file(config)
     >>> img.raw_counts.shape
     (512, 640)
+
+    >>> config = ImageDataConfig(filename="/data/scene.sfmov", fileformat="sfmov")
+    >>> img = ImageDataFactory.create_from_file(config)
+    >>> img.all_frames.shape
+    (100, 512, 640)
     """
 
     @staticmethod
@@ -57,13 +64,13 @@ class ImageDataFactory:
             )
 
         if fileformat == "envi":
-            return ENVI(
-                config.filename,
-                bitdepth=config.bitdepth
-            )
+            return ENVI(config.filename, bitdepth=config.bitdepth)
 
         if fileformat == "rjpeg":
             return RJPEG(config.filename)
+
+        if fileformat == "sfmov":
+            return SFMOV(config.filename)
 
         raise ValueError(f"Unsupported file format: {fileformat}")
 
@@ -77,7 +84,8 @@ class ImageDataFactory:
         filename : str
             Path to the file to check.
         fileformat : str
-            Target format identifier (``'rjpeg'`` or ``'envi'``).
+            Target format identifier (``'rjpeg'``, ``'envi'``, or
+            ``'sfmov'``).
 
         Returns
         -------
@@ -89,4 +97,6 @@ class ImageDataFactory:
             return filename.endswith("_R.jpg")
         if fileformat == "envi":
             return filename.endswith(".hdr")
+        if fileformat == "sfmov":
+            return filename.endswith(".sfmov")
         return False

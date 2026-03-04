@@ -26,6 +26,7 @@ class ImageData(BaseModel):
    model_config = ConfigDict(arbitrary_types_allowed=True)
 
    raw_counts: Optional[np.ndarray] = None
+   all_frames: Optional[np.ndarray] = None
    metadata: dict = Field(
       default_factory=lambda: {
          'sensorType': 'Unknown',

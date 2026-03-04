@@ -1,8 +1,7 @@
-
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal
 
-ImageFormat = Literal["envi", "rjpeg"]
+ImageFormat = Literal["envi", "rjpeg", "sfmov"]
 
 
 class ImageDataConfig(BaseModel):
@@ -16,7 +15,7 @@ class ImageDataConfig(BaseModel):
     filename : str
         Absolute or relative path to the image file.  Must be a non-empty
         string; validated on construction.
-    fileformat : {'rjpeg', 'envi'}, optional
+    fileformat : {'rjpeg', 'envi', 'sfmov'}, optional
         Image file format.  Default is ``'rjpeg'``.
     bitdepth : int, optional
         Bit depth of the image data.  Must be >= 1.  Default is ``16``.
