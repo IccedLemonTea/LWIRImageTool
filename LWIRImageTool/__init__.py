@@ -12,9 +12,10 @@ from .Blackbody import Blackbody
 from .StackImages import stack_images
 from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
 from .ImageDataConfig import ImageDataConfig
+from .NEDT import NEdT_calculation
 
 __all__ = [
     "ImageDataFactory", "ImageData", "ENVI", "RJPEG", "CalibrationDataFactory",
     "CalibrationData", "BlackbodyCalibration", "Blackbody", "stack_images",
-    "BlackbodyCalibrationConfig", "ImageDataConfig"
+    "BlackbodyCalibrationConfig", "ImageDataConfig", "NEdT_calculation"
 ]
