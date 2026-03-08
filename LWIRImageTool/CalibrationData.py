@@ -3,6 +3,7 @@
 # Date : 11/08/2025
 # File : CalibrationData.py
 
+
 from pydantic import BaseModel, ConfigDict
 import numpy as np
 from typing import Optional
@@ -51,4 +52,5 @@ class CalibrationData(BaseModel):
     rsr: Optional[str] = None
     deriv_threshold: Optional[float] = None
     window_fraction: Optional[float] = None
+    number_of_steps: Optional[int] = None
 

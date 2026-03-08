@@ -76,6 +76,7 @@ class BlackbodyCalibration(CalibrationData):
         self.rsr = config.rsr
         self.deriv_threshold = config.deriv_threshold
         self.window_fraction = config.window_fraction
+        self.number_of_steps = len(_array_of_avg_coords) // 2
 
     def find_ascensions(image_stack,
                         deriv_threshold=3,

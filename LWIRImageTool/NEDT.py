@@ -23,28 +23,27 @@ def NEdT_calculation(image_stack, calibration_coefficients, temperatures, wavele
         array_of_avg_coords = BlackbodyCalibration.find_ascensions(image_stack=image_stack, deriv_threshold=3, window_fraction=0.001)
 
 
-        NEDT_array = np.zeros((image_stack.shape[0],image_stack.shape[1],len(temperatures)))
+        NEDT_array = np.zeros((image_stack.shape[0], image_stack.shape[1], len(temperatures)))
         for i, To in enumerate(temperatures):
-
             start = array_of_avg_coords[2 * i]
             stop = array_of_avg_coords[2 * i + 1]
+            diffs = np.diff(radiance_image_stack[:,:,start:stop], axis=2)
+            
+            # Per-pixel std across the temporal axis (axis=2) shape (512, 640)
+            sigma_diff = np.std(diffs, axis=2, ddof=0)
+            
+            sigma = sigma_diff / np.sqrt(2)  # shape (512, 640)
 
-            diffs = np.diff(radiance_image_stack[:,:,start:stop])
-
-            sigma_diff = np.std(diffs, ddof=0)
-            sigma = sigma_diff / np.sqrt(2)
-
-            # Vectorized Planck derivative
+            # Vectorized Planck derivative (scalar)
             Xo = hc_over_k / (wl * To)
             expX = np.exp(Xo)
-
             numerator_dL = numerator * expX * Xo
             denominator = wl5 * (expX - 1)**2 * To
-
             dLdT = (numerator_dL / denominator) * response
+            int_dLdT = integrate.simpson(dLdT, wavelengths)  # scalar
 
-            int_dLdT = integrate.simpson(dLdT, wavelengths)
+            # sigma (512,640) / scalar (512, 640) per-pixel NEDT
+            NEDT_array[:, :, i] = sigma / int_dLdT # NEDT using one standard deviation
 
-            NEDT_array[:, :, i] = sigma / int_dLdT
-        
+
         return NEDT_array
