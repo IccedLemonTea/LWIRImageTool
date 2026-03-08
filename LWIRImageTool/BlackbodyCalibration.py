@@ -59,6 +59,7 @@ class BlackbodyCalibration(CalibrationData):
         CalibrationData.__init__(self)
         self.image_stack = stack_images(config.directory, config.filetype,
                                         config.progress_cb)
+        print(self.image_stack.shape)
         _array_of_avg_coords = BlackbodyCalibration.find_ascensions(self.image_stack,
                                                     config.deriv_threshold,
                                                     config.window_fraction,
@@ -256,8 +257,8 @@ class BlackbodyCalibration(CalibrationData):
             wavelengths = txt_content[:, 0]
             response = txt_content[:, 1]
         elif isinstance(rsr, np.ndarray):
-            wavelengths = rsr[0, :]
-            response = rsr[1, :]
+            wavelengths = rsr[:, 0]
+            response = rsr[:, 1]
         else:
             wavelengths = np.linspace(8, 14, 10000)
             response = np.ones_like(wavelengths)

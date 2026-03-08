@@ -52,39 +52,45 @@ def stack_images(directory, filetype, progress_cb=None):
     file_list = sorted(os.listdir(directory))
     image_list = []
 
+    ### Checking each file in the directory for validity and appending to image_list if they are an image format that is supported ###
     for f in file_list:
         if factory.is_valid_image_file(f, filetype):
             image_list.append(f)
 
-    config = ImageDataConfig(filename = os.path.join(directory, image_list[0]), fileformat= filetype)
-    first_src = factory.create_from_file(config)
+    ### Ending function early, as sfmov files already have the images stacked in a single file, so we can just load that one file and return the frames ###
+    if filetype == "sfmov":
+        config = ImageDataConfig(filename = os.path.join(directory, image_list[0]), fileformat= filetype)
+        first_src = factory.create_from_file(config)
+        return first_src.all_frames
+    else:
+        config = ImageDataConfig(filename = os.path.join(directory, image_list[0]), fileformat= filetype)
+        first_src = factory.create_from_file(config)
+        rows, cols = first_src.raw_counts.shape
+        num_frames = len(image_list)
 
-    rows, cols = first_src.raw_counts.shape
-    num_frames = len(image_list)
+        image_stack = np.zeros((rows, cols, num_frames),
+                            dtype=first_src.raw_counts.dtype)
+        image_stack[:, :, 0] = first_src.raw_counts
 
-    image_stack = np.zeros((rows, cols, num_frames),
-                           dtype=first_src.raw_counts.dtype)
-    image_stack[:, :, 0] = first_src.raw_counts
-
-    # Optional callback update for GUI
-    idx = 0
-    if progress_cb:
-        progress_cb(phase="loading", current=idx + 1, total=num_frames)
-        idx += 1
-
-    # Stacking all images in the target directory
-    for idx, file in enumerate(image_list):
-        file_path = os.path.join(directory, file)
-        config.filename = file_path
-        src = factory.create_from_file(config)
-        image_stack[:, :, idx] = np.array(src.raw_counts)
-
-        # Optional callback for GUI
+        # Optional callback update for GUI
+        idx = 0
         if progress_cb:
             progress_cb(phase="loading", current=idx + 1, total=num_frames)
             idx += 1
 
-    return image_stack
+        # Stacking all images in the target directory
+        for idx, file in enumerate(image_list):
+            file_path = os.path.join(directory, file)
+            config.filename = file_path
+            src = factory.create_from_file(config)
+            image_stack[:, :, idx] = np.array(src.raw_counts)
+
+            # Optional callback for GUI
+            if progress_cb:
+                progress_cb(phase="loading", current=idx + 1, total=num_frames)
+                idx += 1
+
+        return image_stack
 
 
 if __name__ == "__main__":
