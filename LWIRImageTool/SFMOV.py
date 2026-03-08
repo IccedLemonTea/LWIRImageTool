@@ -41,7 +41,7 @@ def _get_data(filename: str) -> np.ndarray:
 
     Seeks past the ASCII header to the ``DATA`` marker and reads all
     subsequent binary data into a 3-D array of shape
-    ``(frames, yPixls, xPixls)``.
+    ``(xPixls, yPixls, frames)``.
 
     Parameters
     ----------
@@ -51,7 +51,7 @@ def _get_data(filename: str) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        3-D array of shape ``(frames, rows, cols)``.  dtype is
+        3-D array of shape ``(cols, rows, frames)``.  dtype is
         ``np.float32`` when ``DaType == 'Flt32'``, otherwise
         ``np.uint16``.
     """
@@ -67,7 +67,8 @@ def _get_data(filename: str) -> np.ndarray:
             -1, meta["yPixls"], meta["xPixls"]
         )
 
-    return data
+    # Transpose from (frames, y, x) -> (y, x, frames) to match workflow convention, keep memory contiguous for QT
+    return np.ascontiguousarray(data.transpose(1, 2, 0))
 
 
 class SFMOV(ImageData):
@@ -109,7 +110,7 @@ class SFMOV(ImageData):
     >>> img.raw_counts.shape
     (512, 640)
     >>> img.all_frames.shape
-    (100, 512, 640)
+    (640, 512, 100)
     >>> img.metadata["numFrames"]
     100
     """
@@ -158,7 +159,8 @@ class SFMOV(ImageData):
 
         self.all_frames = data
         # Expose the first frame as raw_counts to match the ImageData contract
-        self.raw_counts = data[0]
+        # data shape is (x, y, frames), so index the last axis for frame 0
+        self.raw_counts = data[:, :, 0]
 
         da_type = meta.get("DaType", "uint16")
         bit_depth = 32 if da_type == "Flt32" else 16
@@ -169,5 +171,5 @@ class SFMOV(ImageData):
             "horizontalRes": int(meta.get("xPixls", data.shape[2])),
             "verticalRes": int(meta.get("yPixls", data.shape[1])),
             "bands": 1,
-            "numFrames": int(data.shape[0]),
+            "numFrames": int(data.shape[2]),
         })
