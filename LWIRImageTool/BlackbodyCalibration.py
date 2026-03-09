@@ -4,6 +4,8 @@ from .BlackbodyCalibrationConfig import BlackbodyCalibrationConfig
 from .CalibrationData import CalibrationData
 from .StackImages import stack_images
 from .Blackbody import Blackbody
+from typing import Optional
+from pydantic import ConfigDict
 
 
 class BlackbodyCalibration(CalibrationData):
@@ -44,6 +46,10 @@ class BlackbodyCalibration(CalibrationData):
         Derivative threshold multiplier used for ascension detection.
     window_fraction : float
         Window fraction used for ascension detection.
+    _array_of_avg_coords: np.ndarray
+        Array that lists which regions in the data that need to be
+        averaged.
+    
 
     See Also
     --------
@@ -51,21 +57,33 @@ class BlackbodyCalibration(CalibrationData):
     CalibrationDataFactory : Recommended entry point for construction.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    rsr: Optional[str] = None
+    blackbody_temperature: Optional[int] = None
+    temperature_step: Optional[int] = None
+    _deriv_threshold: Optional[float] = None
+    _window_fraction: Optional[float] = None
+    _number_of_steps: Optional[int] = None
+    _array_of_average_coords: Optional[np.ndarray] = None
+    
+
     def __init__(self, config: BlackbodyCalibrationConfig):
         """
         Initializes the calibration by stacking images, detecting ascensions,
         and generating calibration coefficients.
         """
         CalibrationData.__init__(self)
+        
         self.image_stack = stack_images(config.directory, config.filetype,
                                         config.progress_cb)
-        print(self.image_stack.shape)
-        _array_of_avg_coords = BlackbodyCalibration.find_ascensions(self.image_stack,
+
+        self._array_of_avg_coords = BlackbodyCalibration.find_ascensions(self.image_stack,
                                                     config.deriv_threshold,
                                                     config.window_fraction,
                                                     config.progress_cb)
         self.coefficients = self.generate_coefficients(
-            self.image_stack, _array_of_avg_coords,
+            self.image_stack, self._array_of_avg_coords,
             config.blackbody_temperature, config.temperature_step, config.rsr,
             config.progress_cb)
 
@@ -74,9 +92,9 @@ class BlackbodyCalibration(CalibrationData):
         self.blackbody_temperature = config.blackbody_temperature
         self.temperature_step = config.temperature_step
         self.rsr = config.rsr
-        self.deriv_threshold = config.deriv_threshold
-        self.window_fraction = config.window_fraction
-        self.number_of_steps = len(_array_of_avg_coords) // 2
+        self._deriv_threshold = config.deriv_threshold
+        self._window_fraction = config.window_fraction
+        self._number_of_steps = len(self._array_of_avg_coords) // 2
 
     def find_ascensions(image_stack,
                         deriv_threshold=3,

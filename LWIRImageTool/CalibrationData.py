@@ -30,27 +30,10 @@ class CalibrationData(BaseModel):
         ``[:, :, 1]`` is bias.  ``None`` until populated by a subclass.
     directory : str or None
         Path to the directory that was used as the image source.
-    blackbody_temperature : int or None
-        Starting blackbody temperature [K] used during the calibration run.
-    temperature_step : int or None
-        Temperature increment between successive steps [K].
-    rsr : str or None
-        Path to the RSR file used, or ``None`` if a simulated or default
-        RSR was applied.
-    deriv_threshold : float or None
-        Standard-deviation multiplier used for ascension detection.
-    window_fraction : float or None
-        Frame-fraction search window used for ascension detection.
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     image_stack: Optional[np.ndarray] = None
     coefficients: Optional[np.ndarray] = None
     directory : Optional[str] = None
-    blackbody_temperature: Optional[int] = None
-    temperature_step: Optional[int] = None  
-    rsr: Optional[str] = None
-    deriv_threshold: Optional[float] = None
-    window_fraction: Optional[float] = None
-    number_of_steps: Optional[int] = None
 
