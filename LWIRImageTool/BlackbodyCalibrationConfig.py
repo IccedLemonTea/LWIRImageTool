@@ -27,6 +27,10 @@ class BlackbodyCalibrationConfig(BaseModel):
     temperature_step : float
         Temperature increment between successive blackbody steps in Kelvin.
         Must be > 0.
+    environmental_temperature: float
+        Ambient temperature that the calibration was performed at. Just used
+        for recording purposes.
+        Default is 283.15 [K] or 10 [C]
     rsr : str, np.ndarray, or None, optional
         Relative spectral response definition.
 
@@ -62,7 +66,7 @@ class BlackbodyCalibrationConfig(BaseModel):
     temperature_step: float = Field(...,
                                     gt=0,
                                     description="Temperature step [K]")
-
+    environmental_temperature: float = Field(default = 283.15 ,gt=0, description="Environmental Temperature [K]")
     rsr: Optional[Union[str, np.ndarray]] = None
 
     progress_cb: Optional[Callable] = None

@@ -51,12 +51,11 @@ def stack_images(directory, filetype, progress_cb=None):
     factory = ImageDataFactory()
     file_list = sorted(os.listdir(directory))
     image_list = []
-
+    
     ### Checking each file in the directory for validity and appending to image_list if they are an image format that is supported ###
     for f in file_list:
-        if factory.is_valid_image_file(f, filetype):
+        if factory.is_valid_image_file(os.path.join(directory, f), filetype):
             image_list.append(f)
-
     ### Ending function early, as sfmov files already have the images stacked in a single file, so we can just load that one file and return the frames ###
     if filetype == "sfmov":
         config = ImageDataConfig(filename = os.path.join(directory, image_list[0]), fileformat= filetype)

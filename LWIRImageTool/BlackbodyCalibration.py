@@ -58,10 +58,11 @@ class BlackbodyCalibration(CalibrationData):
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    
+
     rsr: Optional[str] = None
     blackbody_temperature: Optional[int] = None
     temperature_step: Optional[int] = None
+    environmental_temperature: Optional[float] = None
     _deriv_threshold: Optional[float] = None
     _window_fraction: Optional[float] = None
     _number_of_steps: Optional[int] = None
@@ -95,6 +96,7 @@ class BlackbodyCalibration(CalibrationData):
         self._deriv_threshold = config.deriv_threshold
         self._window_fraction = config.window_fraction
         self._number_of_steps = len(self._array_of_avg_coords) // 2
+        self.environmental_temperature = config.environmental_temperature
 
     def find_ascensions(image_stack,
                         deriv_threshold=3,
@@ -210,7 +212,7 @@ class BlackbodyCalibration(CalibrationData):
         array_of_avg_coords = np.append(array_of_avg_coords, len(means))
         if progress_cb:
             progress_cb(phase="ascension", current=1, total=1)
-        return array_of_avg_coords
+        return array_of_avg_coords.tolist()
 
     def generate_coefficients(self, image_stack, array_of_avg_coords,
                               blackbody_temperature, tempurature_step, rsr,
@@ -227,7 +229,7 @@ class BlackbodyCalibration(CalibrationData):
         ----------
         image_stack : np.ndarray
             Stacked images, shape ``(rows, cols, frames)``.
-        array_of_avg_coords : np.ndarray
+        array_of_avg_coords : list
             Step boundary indices from ``find_ascensions()``.
         blackbody_temperature : float
             Starting temperature [K].
