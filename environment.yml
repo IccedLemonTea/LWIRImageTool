@@ -1,0 +1,14 @@
+name: LIT
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.13 # Example Python version
+  - numpy
+  - Pillow
+  - matplotlib
+  - scipy
+  - pydantic
+  - pip         # It is important to include pip here
+  - pip:
+    - spectral # Pip-only package
